@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "lib/kernel/list.h"
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -82,6 +83,10 @@ int64_t
 timer_elapsed (int64_t then) 
 {
   return timer_ticks () - then;
+}
+
+bool comp_wakeupsema (const struct list_elem *a, const struct list_elem *b, void *aux) {
+  
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
