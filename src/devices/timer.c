@@ -7,7 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include "lib/kernel/list.h"
+
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -17,6 +17,11 @@
 #if TIMER_FREQ > 1000
 #error TIMER_FREQ <= 1000 recommended
 #endif
+// comparator for list
+static bool wakeup_sema_less (const struct list_elem *,
+                       const struct list_elem *,
+                       void *);
+static void thread_list_waker(void);
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
@@ -31,11 +36,14 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+static struct list wakeup_sema_list;
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
 {
+  list_init (&wakeup_sema_list);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -85,8 +93,14 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-bool comp_wakeupsema (const struct list_elem *a, const struct list_elem *b, void *aux) {
-  
+//list_less_func for comparing wakeup_sema_elem s
+static bool wakeup_sema_less (const struct list_elem *a,
+                      const struct list_elem *b,
+                      void *aux UNUSED) {
+  struct wakeup_sema_elem *sema_elem_a = list_entry(a, struct wakeup_sema_elem, elem);
+  struct wakeup_sema_elem *sema_elem_b = list_entry(b, struct wakeup_sema_elem, elem);
+
+  return (sema_elem_a->wake_up_time < sema_elem_b->wake_up_time);
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
@@ -94,11 +108,29 @@ bool comp_wakeupsema (const struct list_elem *a, const struct list_elem *b, void
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
-
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  if (ticks < 0) {
+    return;
+  }
+
+  int64_t start = timer_ticks ();
+  int64_t wake_up_time = start + ticks;
+  struct semaphore sema;
+  sema_init (&sema, 0);
+
+  struct wakeup_sema_elem wake_elem;
+  wake_elem.wake_up_time = wake_up_time;
+  wake_elem.sema = &sema;
+
+  enum intr_level old_level = intr_disable ();
+
+  list_insert_ordered (&wakeup_sema_list, &(wake_elem.elem),
+             &wakeup_sema_less, NULL);
+  intr_set_level (old_level);
+  sema_down (&sema);
+
+//  while (timer_elapsed (start) < ticks)
+//    thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,12 +203,32 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
+/*
+ * Check the list and wakes up the thread whose wakeup time has passed
+ */
+static void thread_list_waker(void) {
+  struct list_elem *e;
+  int64_t current = timer_ticks();
+
+  for (e = list_begin (&wakeup_sema_list); e != list_end (&wakeup_sema_list);
+       e = list_next (e))
+  {
+    struct wakeup_sema_elem *f = list_entry (e, struct wakeup_sema_elem, elem);
+    if (f->wake_up_time > current) {
+      break;
+    } else {
+      list_remove(&(f->elem));
+      sema_up (f->sema);
+    }
+  }
+}
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  thread_list_waker();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

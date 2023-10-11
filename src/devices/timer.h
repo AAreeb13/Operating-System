@@ -3,6 +3,7 @@
 
 #include <round.h>
 #include <stdint.h>
+#include "../lib/kernel/list.h"
 
 /* Number of timer interrupts per second. */
 #define TIMER_FREQ 100
@@ -12,8 +13,8 @@
 struct wakeup_sema_elem
 {
     int64_t wake_up_time;
-    semaphore sema;
-    struct list_elem *elem;
+    struct semaphore *sema;
+    struct list_elem elem;
 };
 
 void timer_init (void);
@@ -21,6 +22,8 @@ void timer_calibrate (void);
 
 int64_t timer_ticks (void);
 int64_t timer_elapsed (int64_t);
+
+
 
 /* Sleep and yield the CPU to other threads. */
 void timer_sleep (int64_t ticks);
