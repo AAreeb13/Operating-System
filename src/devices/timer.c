@@ -17,7 +17,7 @@
 #if TIMER_FREQ > 1000
 #error TIMER_FREQ <= 1000 recommended
 #endif
-// comparator for list
+
 static bool wakeup_sema_less (const struct list_elem *,
                        const struct list_elem *,
                        void *);
@@ -93,7 +93,9 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-//list_less_func for comparing wakeup_sema_elem s
+/*
+ * list_less_func for comparing wakeup_sema_elem s
+ */
 static bool wakeup_sema_less (const struct list_elem *a,
                       const struct list_elem *b,
                       void *aux UNUSED) {
@@ -109,7 +111,7 @@ void
 timer_sleep (int64_t ticks) 
 {
   ASSERT (intr_get_level () == INTR_ON);
-  if (ticks < 0) {
+  if (ticks <= 0) {
     return;
   }
 
@@ -129,8 +131,6 @@ timer_sleep (int64_t ticks)
   intr_set_level (old_level);
   sema_down (&sema);
 
-//  while (timer_elapsed (start) < ticks)
-//    thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -204,7 +204,7 @@ timer_print_stats (void)
 }
 
 /*
- * Check the list and wakes up the thread whose wakeup time has passed
+ * Checks the list, removes and wakes up the thread whose wakeup time has passed
  */
 static void thread_list_waker(void) {
   struct list_elem *e;
