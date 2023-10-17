@@ -318,16 +318,15 @@ thread_exit (void)
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
-thread_yield (void) 
-{
-  struct thread *cur = thread_current ();
+thread_yield (void) {
+  struct thread *cur = thread_current();
   enum intr_level old_level;
-  
-  ASSERT (!intr_context ());
 
-  old_level = intr_disable ();
+  ASSERT(!intr_context());
+
+  old_level = intr_disable();
   if (cur != idle_thread)
-    list_insert_ordered (&ready_list, &cur->elem, &priority_list_less_func, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, &priority_list_less_func, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -363,12 +362,11 @@ thread_set_priority (int new_priority)
   }
 
   struct list_elem *ready_list_first_elem = list_begin(&ready_list);
-  int first_elem_priority = list_entry(first_ready_list_elem,
+  int first_elem_priority = list_entry(ready_list_first_elem,
                                        struct thread,
                                        elem) -> priority;
 
   if (new_priority < first_elem_priority) {
-    list_insert_ordered(&ready_list, &thread_current()-> elem, priority_list_less_func(), NULL);
     thread_yield();
   }
 }

@@ -286,7 +286,7 @@ static void wake_threads(void) {
   for (e = list_begin(&timer_sleep_list); e != list_end(&timer_sleep_list); e = list_next(e)) {
     struct timer_sleep_list_elem *elem = list_entry(e, struct timer_sleep_list_elem, elem);
     if (elem -> wake_time <= current_time) {
-      list_remove(&elem -> elem);
+      list_remove(e);
       sema_up(elem -> semaphore);
     } else {
       break;
