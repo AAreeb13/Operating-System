@@ -357,6 +357,13 @@ thread_set_priority (int new_priority)
 {
   thread_current ()->priority = new_priority;
 
+  if (!thread_mlfqs) {
+    int eff_priority = thread_current()->effective_priority;
+    thread_current()->effective_priority = new_priority > eff_priority ? new_priority : eff_priority;
+  } else {
+    thread_current() ->effective_priority = new_priority;
+  }
+
   if (list_empty(&ready_list)) {
     return;
   }
@@ -375,7 +382,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  return thread_current ()->effective_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -622,5 +629,5 @@ static bool priority_list_less_func(const struct list_elem *a,
                                     void *aux UNUSED) {
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
-  return thread_a -> priority > thread_b -> priority;
+  return thread_a -> effective_priority > thread_b -> effective_priority;
 }
