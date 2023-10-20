@@ -194,7 +194,11 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
-  init_thread (t, name, thread_current()->priority);
+  if (thread_mlfq) {
+    init_thread (t, name, thread_current()->priority);
+  } else {
+    init_thread (t, name, priority);
+  }
   tid = t->tid = allocate_tid ();
 
   /* Prepare thread for first run by initializing its stack.
@@ -380,15 +384,15 @@ thread_set_priority (int new_priority)
 /* I did not use fixed points since 
 there are no other real num involved */
 int thread_calculate_priority() {
-    int result = PRI_MAX - 
-    (thread_get_recent_cpu() / 400) - (2 * thread_get_nice());
-    if (result > PRI_MAX) {
-      return PRI_MAX;
-    } else if (result < PRI_MIN) {
-      return PRI_MIN;
-    } else {
-      return result;
-    }
+  int result = PRI_MAX - 
+               (thread_get_recent_cpu() / 400) - (2 * thread_get_nice());
+  if (result > PRI_MAX) {
+    return PRI_MAX;
+  } else if (result < PRI_MIN) {
+    return PRI_MIN;
+  } else {
+    return result;
+  }
 }
 
 /* Returns the current thread's priority. */
