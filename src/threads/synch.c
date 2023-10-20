@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static void priority_donation(struct lock *);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -196,6 +198,11 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  if (!thread_mlfqs) {
+    priority_donation(lock);
+
+  }
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -335,4 +342,24 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+
+void priority_donation(struct lock *lock) {
+  struct thread *donor = thread_current();
+  struct thread *donee = lock->holder;
+
+  if (lock_try_acquire(lock)) {
+    return;
+  }
+
+  /* Store priority temporarily and implement donation. */
+  donee->priority = donee->effective_priority;
+  int stored_priority = donee->effective_priority;
+  donee->effective_priority = donor ->effective_priority;
+
+  // change donee position in ready list
+  // semadown
+  // donee-effectivepriority = eff_priority
+  // change position
+
 }
