@@ -365,8 +365,8 @@ thread_set_priority (int new_priority)
 
     struct list_elem *ready_list_first_elem = list_begin(&ready_list);
     int first_elem_priority = list_entry(ready_list_first_elem,
-    struct thread,
-    elem) -> priority;
+                                         struct thread,
+                                         elem) -> priority;
 
     if (new_priority < first_elem_priority) {
       thread_yield();
