@@ -20,6 +20,8 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
+static int load_avg_100;
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -192,7 +194,7 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
-  init_thread (t, name, priority);
+  init_thread (t, name, thread_current()->priority);
   tid = t->tid = allocate_tid ();
 
   /* Prepare thread for first run by initializing its stack.
@@ -355,20 +357,38 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  if (thread_mlfqs) {
 
-  if (list_empty(&ready_list)) {
-    return;
-  }
+  } else {
+    thread_current ()->priority = new_priority;
+    if (list_empty(&ready_list)) {
+      return;
+    }
 
-  struct list_elem *ready_list_first_elem = list_begin(&ready_list);
-  int first_elem_priority = list_entry(ready_list_first_elem,
+    struct list_elem *ready_list_first_elem = list_begin(&ready_list);
+    int first_elem_priority = list_entry(ready_list_first_elem,
                                        struct thread,
                                        elem) -> priority;
 
-  if (new_priority < first_elem_priority) {
-    thread_yield();
+    if (new_priority < first_elem_priority) {
+      thread_yield();
+    }
   }
+  
+}
+
+/* I did not use fixed points since 
+there are no other real num involved */
+int thread_calculate_priority() {
+    int result = PRI_MAX - 
+    (thread_get_recent_cpu() / 400) - (2 * thread_get_nice());
+    if (result > PRI_MAX) {
+      return PRI_MAX;
+    } else if (result < PRI_MIN) {
+      return PRI_MIN;
+    } else {
+      return result;
+    }
 }
 
 /* Returns the current thread's priority. */
@@ -383,8 +403,13 @@ void
 thread_set_nice (int new_nice) 
 {
   thread_current()->nice = new_nice;
+  thread_current()->priority = thread_calculate_priority();
+  /* Yield if no longer highest 
+  We can implement a function that finds next thread
+  and checks if that threads priority is same as our one
+  If it is same or lower, then we run, otherwise we yield
   
-  /* Need to recalculate thread priority and yield if no longer highest */
+  We can also have the next ready to run thread calculated beforehand*/
 }
 
 /* Returns the current thread's nice value. */
@@ -398,16 +423,14 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return load_avg_100;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->recent_cpu_100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
