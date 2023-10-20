@@ -365,7 +365,7 @@ thread_set_priority (int new_priority)
 
   if (!thread_mlfqs) {
     int eff_priority = thread_current()->effective_priority;
-    thread_current()->effective_priority = new_priority > eff_priority ? new_priority : eff_priority;
+    thread_current()->effective_priority = MAX(new_priority,eff_priority);
     first_elem_priority = list_entry(ready_list_first_elem,
                                         struct thread,
                                         elem)->effective_priority;
@@ -651,4 +651,8 @@ static bool priority_list_less_func(const struct list_elem *a,
   }
   return thread_a->priority > thread_b->priority;
 
+}
+void move_ready_thread(struct thread *t){
+  list_remove(&t->elem);
+  list_insert_ordered(&ready_list,&t->elem, priority_list_less_func, NULL);
 }

@@ -26,11 +26,11 @@
    MODIFICATIONS.
 */
 
-#include "threads/synch.h"
+#include "../threads/synch.h"
 #include <stdio.h>
 #include <string.h>
-#include "threads/interrupt.h"
-#include "threads/thread.h"
+#include "../threads/interrupt.h"
+#include "../threads/thread.h"
 
 static void priority_donation(struct lock *);
 
@@ -200,7 +200,7 @@ lock_acquire (struct lock *lock)
 
   if (!thread_mlfqs) {
     priority_donation(lock);
-
+    return;
   }
 
   sema_down (&lock->semaphore);
@@ -353,9 +353,17 @@ void priority_donation(struct lock *lock) {
   }
 
   /* Store priority temporarily and implement donation. */
-  donee->priority = donee->effective_priority;
-  int stored_priority = donee->effective_priority;
-  donee->effective_priority = donor ->effective_priority;
+  int old_effective_priority = donee->effective_priority;
+  donee->effective_priority = MAX(donor->effective_priority,donee->effective_priority);
+  if(donee->status == THREAD_READY){
+    move_ready_thread(donee);
+    //reinsert into ready list
+  } else if (donee->status == THREAD_BLOCKED) {
+    // change priority
+    // NOTE: must USE list_max() to get highest priority thread
+  }
+  sema_down(&lock->semaphore);
+  donee->effective_priority = MAX(old_effective_priority,donee->effective_priority);
 
   // change donee position in ready list
   // semadown

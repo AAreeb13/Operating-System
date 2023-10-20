@@ -47,5 +47,5 @@ void cond_broadcast (struct condition *, struct lock *);
    optimization barrier.  See "Optimization Barriers" in the
    reference guide for more information.*/
 #define barrier() asm volatile ("" : : : "memory")
-
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif /* threads/synch.h */
