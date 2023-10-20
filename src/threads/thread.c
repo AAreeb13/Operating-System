@@ -21,6 +21,7 @@
 #define THREAD_MAGIC 0xcd6abf4b
 
 static int load_avg_100;
+static int ready_threads;
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -103,6 +104,9 @@ thread_init (void)
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
+  if (thread_mlfqs) {
+    ready_threads++;
+  }
   initial_thread->tid = allocate_tid ();
 }
 
@@ -194,7 +198,7 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
-  if (thread_mlfq) {
+  if (thread_mlfqs) {
     init_thread (t, name, thread_current()->priority);
   } else {
     init_thread (t, name, priority);
@@ -242,6 +246,10 @@ thread_block (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   thread_current ()->status = THREAD_BLOCKED;
+  if (thread_mlfqs) {
+    ready_threads--;
+  }
+
   schedule ();
 }
 
@@ -264,6 +272,9 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered (&ready_list, &t->elem, &priority_list_less_func, NULL);
   t->status = THREAD_READY;
+  if (thread_mlfqs) {
+    ready_threads++;
+  }
   intr_set_level (old_level);
 }
 
@@ -317,6 +328,9 @@ thread_exit (void)
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
+  if (thread_mlfqs) {
+    ready_threads--;
+  }
   schedule ();
   NOT_REACHED ();
 }
