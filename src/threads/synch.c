@@ -344,7 +344,7 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
-void donate_priority(struct lock *lock) {
+void priority_donation(struct lock *lock) {
   struct thread *donor = thread_current();
   struct thread *donee = lock->holder;
 
@@ -371,4 +371,8 @@ void donate_priority(struct lock *lock) {
   list_remove(&donor->donor_elem); // Remove the donor from the list once done.
 
   // change position
+}
+
+void return_priority(struct lock *lock) {
+  
 }
