@@ -344,7 +344,7 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
-void priority_donation(struct lock *lock) {
+void donate_priority(struct lock *lock) {
   struct thread *donor = thread_current();
   struct thread *donee = lock->holder;
 
@@ -352,22 +352,23 @@ void priority_donation(struct lock *lock) {
     return;
   }
 
-  /* Store priority temporarily and implement donation. */
+  /* Store priority temporarily and implement donation. Put donor into donee's donor list. */
+  /* list_insert_ordered(&donee->donors, &donor->donor_elem, priority_list_less_func, NULL);
+  The above function is allowed only if we make pllf non-static. Insert > MAX for now. */
+  list_insert(&donee->donors, &donor->donor_elem);
   int old_effective_priority = donee->effective_priority;
   donee->effective_priority = MAX(donor->effective_priority,donee->effective_priority);
+
   if(donee->status == THREAD_READY){
     move_ready_thread(donee);
-    //reinsert into ready list
   } else if (donee->status == THREAD_BLOCKED) {
     // change priority
     // NOTE: must USE list_max() to get highest priority thread
   }
+
   sema_down(&lock->semaphore);
   donee->effective_priority = MAX(old_effective_priority,donee->effective_priority);
+  list_remove(&donor->donor_elem); // Remove the donor from the list once done.
 
-  // change donee position in ready list
-  // semadown
-  // donee-effectivepriority = eff_priority
   // change position
-
 }
