@@ -672,3 +672,11 @@ static bool priority_list_less_func(const struct list_elem *a,
   struct thread *thread_b = list_entry(b, struct thread, elem);
   return thread_a -> priority > thread_b -> priority;
 }
+
+bool is_idle_thread(struct thread *t) {
+  return t == idle_thread;
+]
+
+/* TODO */
+void recalculate_load_avg(void) {
+}
