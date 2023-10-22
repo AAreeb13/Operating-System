@@ -196,6 +196,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   wake_threads();
+  if (mlfqs) {
+    if (!is_idle_thread(current_thread())) {
+      current_thread()->recent_cpu_100++;
+    }  
+    if (timer_ticks() % TIMER_FREQ == 0) {
+      recalculate_load_avg();
+      thread_foreach(&recalculate_recent_cpu, NULL);
+    }
+  }  
   thread_tick ();
 }
 

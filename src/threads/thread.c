@@ -680,3 +680,7 @@ bool is_idle_thread(struct thread *t) {
 /* TODO */
 void recalculate_load_avg(void) {
 }
+
+/* TODO */
+void recalculate_recent_cpu(struct thread *t, void *aux) {
+}
