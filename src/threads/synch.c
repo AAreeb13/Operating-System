@@ -33,6 +33,8 @@
 #include "../threads/thread.h"
 
 static void priority_donation(struct lock *);
+static void return_priority(struct lock *);
+
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -70,7 +72,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_list_less_func, NULL);
       thread_block ();
     }
   sema->value--;
@@ -116,7 +118,7 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
+    thread_unblock (list_entry (list_max (&sema->waiters, priority_list_less_func, NULL),
                                 struct thread, elem));
   sema->value++;
   intr_set_level (old_level);
@@ -233,15 +235,17 @@ lock_try_acquire (struct lock *lock)
    make sense to try to release a lock within an interrupt
    handler. */
 void
-lock_release (struct lock *lock) 
-{
-  ASSERT (lock != NULL);
-  ASSERT (lock_held_by_current_thread (lock));
+lock_release (struct lock *lock) {
+  ASSERT(lock != NULL);
+  ASSERT(lock_held_by_current_thread(lock));
 
   lock->holder = NULL;
-  sema_up (&lock->semaphore);
-}
+  sema_up(&lock->semaphore);
 
+  if (!thread_mlfqs) {
+    return_priority(lock);
+  }
+}
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
@@ -344,6 +348,13 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
+
+//CHECK LIST
+// 1. check if the lock is free
+// 2. put in donors
+// 3. change donee priority
+// 4. if ready, move in ready list
+// 4. if blocked, then
 void priority_donation(struct lock *lock) {
   struct thread *donor = thread_current();
   struct thread *donee = lock->holder;
@@ -355,8 +366,7 @@ void priority_donation(struct lock *lock) {
   /* Store priority temporarily and implement donation. Put donor into donee's donor list. */
   /* list_insert_ordered(&donee->donors, &donor->donor_elem, priority_list_less_func, NULL);
   The above function is allowed only if we make pllf non-static. Insert > MAX for now. */
-  list_insert(&donee->donors, &donor->donor_elem);
-  int old_effective_priority = donee->effective_priority;
+  list_insert_ordered(&donee->donors, &donor->donor_elem, priority_list_less_func, NULL);
   donee->effective_priority = MAX(donor->effective_priority,donee->effective_priority);
 
   if(donee->status == THREAD_READY){
@@ -367,12 +377,37 @@ void priority_donation(struct lock *lock) {
   }
 
   sema_down(&lock->semaphore);
-  donee->effective_priority = MAX(old_effective_priority,donee->effective_priority);
-  list_remove(&donor->donor_elem); // Remove the donor from the list once done.
 
-  // change position
 }
 
 void return_priority(struct lock *lock) {
-  
+  if (list_empty(&(lock->semaphore).waiters) || &thread_current()->donors){
+    return;
+  }
+  for (struct list_elem *e = list_begin(&(lock->semaphore).waiters);
+       e != list_end(&(lock->semaphore).waiters);
+       e = list_next(e)) {
+    struct thread *thread_waiting = list_entry(e, struct thread, elem);
+    struct list_elem donor_elem = thread_waiting->donor_elem;
+    for (struct list_elem *e2 = list_begin(&thread_current()->donors);
+         e2 != list_end(&thread_current()->donors);
+         e2 = list_next(e)) {
+      if (e2 == &donor_elem) {
+        list_remove(&donor_elem);
+      }
+    }
+  }
+  if (list_empty(&thread_current()->donors)) {
+    thread_current()->effective_priority = thread_current()->priority;
+  }else {
+    struct list_elem *highest_donor_elem = list_begin(&thread_current()->donors);
+    thread_current()->effective_priority = list_entry(highest_donor_elem,struct thread, donor_elem)->effective_priority;
+  }
+  thread_set_priority(thread_current()->priority);
+
+  // all threads in waiting list must be removed from donor list
+  // change effect_priority to the max effect_priority in donor list
+  // if donor list is empty, effect = base
+  // check that effect_priority is still largest
+  // if largest then continue else yield
 }

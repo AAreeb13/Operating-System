@@ -71,9 +71,6 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-static bool priority_list_less_func(const struct list_elem *,
-    const struct list_elem *,
-    void *);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -96,7 +93,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init (&thread_current()->donors); // Initialises donors list for each thread.
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -518,6 +514,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   if (!thread_mlfqs) {
     t->effective_priority = priority;
+    list_init (&t->donors); // Initialises donors list for each thread.
   }
   t->magic = THREAD_MAGIC;
 
@@ -641,9 +638,9 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* list_less_func for ordering by non-decreasing priority. */
-static bool priority_list_less_func(const struct list_elem *a,
-                                    const struct list_elem *b,
-                                    void *aux UNUSED) {
+bool priority_list_less_func(const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED) {
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
 
