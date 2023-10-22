@@ -207,7 +207,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       
       bool already_in_list = false;
       index j = 0;
-      for (int i = 0; ran_threads[i] != NULL; i++) {
+      for (int i = 0; ran_threads[i] != NULL && i < 4; i++) {
         already_in_list = cur == ran_threads[i];
         if (already_in_list) {
           break;
@@ -224,7 +224,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       thread_foreach(&recalculate_recent_cpu, NULL);
       thread_foreach(&thread_calculate_priority, NULL);
     } else if (timer_ticks() % TIME_SLICE == 0) {
-       for (int i = 0; ran_threads[i] != NULL; i++) {
+       for (int i = 0; ran_threads[i] != NULL && i < 4; i++) {
        thread_calculate_priority(ran_threads[i]);
        ran_threads[i] = NULL;
        }
