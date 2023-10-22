@@ -27,6 +27,9 @@ static unsigned loops_per_tick;
 /* List of sleeping threads put to sleep by timer_sleep() */
 static struct list timer_sleep_list;
 
+/* Array of threads running in the current time slice */
+static struct thread *ran_threads[4];
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -197,12 +200,34 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   wake_threads();
   if (mlfqs) {
-    if (!is_idle_thread(current_thread())) {
-      current_thread()->recent_cpu_100 += 100;
-    }  
+    struct thread *cur = thread_current();
+
+    if (!is_idle_thread(cur)) {
+      cur->recent_cpu_100 += 100;
+      
+      bool already_in_list = false;
+      index j = 0;
+      for (int i = 0; ran_threads[i] != NULL; i++) {
+        already_in_list = cur == ran_threads[i];
+        if (already_in_list) {
+          break;
+        }
+        j++;
+      }
+      if (!already_in_list) {
+        ran_threads[j] = cur;
+      }
+    }
+
     if (timer_ticks() % TIMER_FREQ == 0) {
       recalculate_load_avg();
       thread_foreach(&recalculate_recent_cpu, NULL);
+      thread_foreach(&thread_calculate_priority, NULL);
+    } else if (timer_ticks() % TIME_SLICE == 0) {
+       for (int i = 0; ran_threads[i] != NULL; i++) {
+       thread_calculate_priority(ran_threads[i]);
+       ran_threads[i] = NULL;
+       }
     }
   }  
   thread_tick ();
