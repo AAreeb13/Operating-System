@@ -140,5 +140,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+bool is_idle_thread(struct thread *);
+void recalculate_load_avg(void);
+void recalculate_recent_cpu(struct thread *, void *);
 
 #endif /* threads/thread.h */

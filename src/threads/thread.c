@@ -62,6 +62,9 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-mlfqs". */
 bool thread_mlfqs;
 
+/* Array of mlfqs for BSD */
+struct list arr_of_queues[64];
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -97,7 +100,13 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
+  if (thread_mlfqs) {
+    for (int i = 0; i < 64; i++) {
+      list_init(&arr_of_queues[i]);
+    }
+  } else {
+    list_init (&ready_list);
+  }
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -667,4 +676,16 @@ static bool priority_list_less_func(const struct list_elem *a,
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
   return thread_a -> priority > thread_b -> priority;
+}
+
+bool is_idle_thread(struct thread *t) {
+  return t == idle_thread;
+]
+
+/* TODO */
+void recalculate_load_avg(void) {
+}
+
+/* TODO */
+void recalculate_recent_cpu(struct thread *t, void *aux) {
 }
