@@ -309,7 +309,7 @@ static void insert_and_increment(void) {
   struct thread *cur = thread_current();
 
   if (!is_idle_thread(cur)) {
-    cur->recent_cpu_100 += 100;
+    cur->recent_cpu += 100;
 
     bool already_in_list = false;
     index j = 0;
