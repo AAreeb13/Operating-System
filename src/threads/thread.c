@@ -62,7 +62,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-mlfqs". */
 bool thread_mlfqs;
 
-/* Array of mlfqs for BSD*/
+/* Array of mlfqs for BSD */
 struct list arr_of_queues[64];
 
 static void kernel_thread (thread_func *, void *aux);
