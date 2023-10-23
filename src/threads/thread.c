@@ -105,7 +105,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   if (thread_mlfqs) {
-    ready_threads++;
+    ready_threads = 1;
   }
   initial_thread->tid = allocate_tid ();
 }
@@ -394,7 +394,7 @@ thread_set_priority (int new_priority)
 
 /* I did not use fixed points since 
 there are no other real num involved */
-int thread_calculate_priority() {
+int thread_calculate_priority(void) {
   int result = PRI_MAX - 
                (thread_get_recent_cpu() / 400) - (2 * thread_get_nice());
   if (result > PRI_MAX) {
@@ -447,6 +447,11 @@ thread_get_recent_cpu (void)
 {
   return thread_current()->recent_cpu_100;
 }
+
+int thread_calc_recent_cpu(void) {
+
+}
+
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
