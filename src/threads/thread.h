@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "lib/fixedpoint.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -101,7 +102,7 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
     uint8_t nice;                       /* Nice number for BSD */
-    uint8_t recent_cpu_100              /* Recent Cpu usage value*/
+    fixed_point_t recent_cpu            /* Recent Cpu usage value*/
   };
 
 /* If false (default), use round-robin scheduler.

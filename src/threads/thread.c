@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <random.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
@@ -11,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "lib/fixedpoint.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -20,8 +22,9 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-static int load_avg_100;
+static fixed_point_t load_avg;
 static int ready_threads;
+
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -116,7 +119,8 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   if (thread_mlfqs) {
-    ready_threads++;
+    ready_threads = 1;
+    load_avg = 0;
   }
   initial_thread->tid = allocate_tid ();
 }
@@ -389,6 +393,10 @@ thread_foreach (thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY.
    Yields if no longer the highest priority thread. */
 
+void update_thread(struct thread *t) {
+  t->recent_cpu = recalculate_recent_cpu(struct thread *t, void *aux);
+}
+
 void
 thread_set_priority (int new_priority) 
 {
@@ -409,11 +417,17 @@ thread_set_priority (int new_priority)
   }
 }
 
+void set_priority_thread(struct thread *t) {
+  t->priority = calculate_priority_thread(t);
+}
+
 /* I did not use fixed points since 
 there are no other real num involved */
-int thread_calculate_priority() {
+int calculate_priority_thread(struct thread *t) {
+  fixed_point_t fixed_point_term2 = FIXED_POINT_DIVIDE_INT(t->recent_cpu, 4);
   int result = PRI_MAX - 
-               (thread_get_recent_cpu() / 400) - (2 * thread_get_nice());
+               (FIXED_POINT_TO_INT(fixed_point_term2)) - 
+               (2 * t->nice);
   if (result > PRI_MAX) {
     return PRI_MAX;
   } else if (result < PRI_MIN) {
@@ -435,7 +449,7 @@ void
 thread_set_nice (int new_nice) 
 {
   thread_current()->nice = new_nice;
-  thread_current()->priority = thread_calculate_priority();
+  thread_current()->priority = calculate_priority_thread();
   /* Yield if no longer highest 
   We can implement a function that finds next thread
   and checks if that threads priority is same as our one
@@ -455,15 +469,69 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  return load_avg_100;
+  return calc_hundred_times_val(load_avg);
 }
 
-/* Returns 100 times the current thread's recent_cpu value. */
+/* Returns 100 times the current thread's recent_cpu value. 
+It does it by doing fixed point calculations.
+*/
 int
 thread_get_recent_cpu (void) 
 {
-  return thread_current()->recent_cpu_100;
+  return calc_hundred_times_val(thread_current()->recent_cpu);
 }
+
+/* Takes in field which is in fixed point and returns 100 times its actual value */ 
+int calc_hundred_times_val(fixed_point_t field) {
+  fixed_point_t fixed_point_val = FIXED_POINT_MULTIPLY_INT(field, 100);
+  int result = FIXED_POINT_TO_INT(fixed_point_val);
+
+  if (fixed_point_val > INT_MAX || fixed_point_val < INT_MIN) {
+    printf("THERE IS AN OVERFLOW IN CALC HUNDRED!");
+  } 
+  return result;
+}
+
+int thread_calc_recent_cpu(void) {
+  
+
+}
+
+/* 
+load_avg = (59/60)*load_avg + (1/60)*ready_threads
+= 1/60 (59*load_avg + ready_threads)
+First multiplies 59 by load_avg fixed point
+Then adds it to 60*ready_thread
+then divides by 60 
+*/
+void recalculate_load_avg(void) {
+  fixed_point_t result = FIXED_POINT_MULTIPLY_INT(load_avg, 59);
+  result = FIXED_POINT_ADD_INT(result, ready_threads);
+  result = FIXED_POINT_DIVIDE_INT(result, 60);
+  load_avg = result;
+}
+
+/*
+recent_cpu = (2*load_avg )/(2*load_avg + 1) * recent_cpu + nice
+First calculate 2*load_avg
+Then 2*load_avg + 1
+Then divides them together to find coefficient, since multipling can led to overflow
+Then multiplies by recent_cpu
+Lastly adds nice
+*/
+void recalculate_recent_cpu(struct thread *t, void *aux) {
+  int nice = t->nice;
+  fixed_point_t recent_cpu = t->recent_cpu;
+  fixed_point_t numerator = FIXED_POINT_MULTIPLY_INT(load_avg, 2);
+  fixed_point_t denominator = FIXED_POINT_ADD_INT(numerator, 1);
+  fixed_point_t coefficient = FIXED_POINT_DIVIDE(numerator, denominator);
+  fixed_point_t result = FIXED_POINT_MULTIPLY(coefficient, recent_cpu);
+  result = FIXED_POINT_ADD_INT(result, nice);
+  t->recent_cpu = result;
+}
+
+
+
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -683,14 +751,6 @@ static bool priority_list_less_func(const struct list_elem *a,
 
 bool is_idle_thread(struct thread *t) {
   return t == idle_thread;
-]
-
-/* TODO */
-void recalculate_load_avg(void) {
-}
-
-/* TODO */
-void recalculate_recent_cpu(struct thread *t, void *aux) {
 }
 
 /* Insert current thread in ran_threads if not already in array and increment its recent_cpu unless idle_thread. */
