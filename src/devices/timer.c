@@ -27,9 +27,6 @@ static unsigned loops_per_tick;
 /* List of sleeping threads put to sleep by timer_sleep() */
 static struct list timer_sleep_list;
 
-/* Array of threads running in the current time slice */
-static struct thread *ran_threads[4];
-
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);

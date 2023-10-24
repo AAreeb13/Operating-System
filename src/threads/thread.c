@@ -34,6 +34,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* Array of threads running in the current time slice */
+static struct thread *ran_threads[4];
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -82,6 +85,7 @@ static bool priority_list_less_func(const struct list_elem *,
                                     void *);
 static void insert_and_increment(void);
 static void recalculate(void);
+static void reinsert(struct thread *);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -157,15 +161,15 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  if (thread_mlfqs) {
-    insert_and_increment();
-    recalculate();
-  }
-
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-
+  if (++thread_ticks >= TIME_SLICE) {
+    if (thread_mlfqs) {
+      insert_and_increment();
+      recalculate();
+    }
     intr_yield_on_return ();
+  }
+  yield_if_lower();
 }
 
 /* Prints thread statistics. */
@@ -364,6 +368,23 @@ thread_yield (void) {
   intr_set_level (old_level);
 }
 
+/* Yields the CPU if the current thread has a lower priority than a ready thread. */
+void yield_if_lower(void) {
+  if (!list_empty(&ready_list)) {
+    int first_elem_priority = list_entry(list_begin(&ready_list),
+    struct thread,
+    elem) -> priority;
+    if (thread_current()->priority < first_elem_priority) {
+      if (intr_context()) {
+        intr_yield_on_return();
+      } else {
+        thread_yield();
+      }
+    }
+  }
+}
+
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -383,11 +404,11 @@ thread_foreach (thread_action_func *func, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY.
    Yields if no longer the highest priority thread. */
-
 void update_thread(struct thread *t, void *aux) {
   recalculate_recent_cpu(t, NULL);
   recalculate_priority(t);
 }
+/* TODO remove NULL signature and add UNUSED flag*/
 
 void
 thread_set_priority (int new_priority) 
@@ -411,6 +432,7 @@ thread_set_priority (int new_priority)
 
 void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
+  reinsert(t);
 }
 
 /* I did not use fixed points since 
@@ -778,5 +800,13 @@ static void recalculate(void) {
       recalculate_priority(ran_threads[i]);
       ran_threads[i] = NULL;
     }
+  }
+}
+
+/* Reinserts the thread into the ready list after its priority has been recalculated. */
+static void reinsert(struct thread *t) {
+  if (t->status == THREAD_READY) {
+    list_remove(&t->elem);
+    list_insert_ordered(&ready_list, &t->elem, &priority_list_less_func, NULL);
   }
 }
