@@ -41,9 +41,6 @@ static bool timer_list_less_func(const struct list_elem *,
                                  void *);
 static void wake_threads(void);
 
-static void insert_and_increment(void);
-static void recalculate(void);
-
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -202,10 +199,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   wake_threads();
-  if (thread_mlfqs) {
-    insert_and_increment();
-    recalculate();
-  }  
   thread_tick ();
 }
 
@@ -300,44 +293,6 @@ static void wake_threads(void) {
       sema_up(elem -> semaphore);
     } else {
       break;
-    }
-  }
-}
-
-/* Insert current thread in ran_threads if not already in array and increment its recent_cpu unless idle_thread. */
-static void insert_and_increment(void) {
-  struct thread *cur = thread_current();
-
-  if (!is_idle_thread(cur)) {
-    cur->recent_cpu += 100;
-
-    bool already_in_list = false;
-    index j = 0;
-    for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
-      already_in_list = cur == ran_threads[i];
-      if (already_in_list) {
-        break;
-      }
-      j++;
-    }
-    if (!already_in_list) {
-      ran_threads[j] = cur;
-    }
-  }
-}
-
-/* Recalculate load_avg and priority for necessary threads */
-static void recalculate(void) {
-  if (timer_ticks() % TIMER_FREQ == 0) {
-    recalculate_load_avg();
-    thread_foreach(&thread_calculate_priority, NULL);
-    for (int i = 0; i < 4; i++) {
-      ran_threads[i] = NULL;
-    }
-  } else if (timer_ticks() % TIME_SLICE == 0) {
-    for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
-      thread_calculate_priority(ran_threads[i]);
-      ran_threads[i] = NULL;
     }
   }
 }
