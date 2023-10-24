@@ -385,8 +385,9 @@ thread_foreach (thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY.
    Yields if no longer the highest priority thread. */
 
-void update_thread(struct thread *t) {
-  t->recent_cpu = recalculate_recent_cpu(struct thread *t, void *aux);
+void update_thread(struct thread *t, void *aux) {
+  recalculate_recent_cpu(t, NULL);
+  recalculate_priority(t);
 }
 
 void
@@ -409,7 +410,7 @@ thread_set_priority (int new_priority)
   }
 }
 
-void set_priority_thread(struct thread *t) {
+void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
 }
 
@@ -440,8 +441,10 @@ thread_get_priority (void)
 void
 thread_set_nice (int new_nice) 
 {
-  thread_current()->nice = new_nice;
-  thread_current()->priority = calculate_priority_thread();
+  struct thread *t = thread_current();
+  t->nice = new_nice;
+  recalculate_priority(t);
+
   /* Yield if no longer highest 
   We can implement a function that finds next thread
   and checks if that threads priority is same as our one
@@ -484,10 +487,6 @@ int calc_hundred_times_val(fixed_point_t field) {
   return result;
 }
 
-int thread_calc_recent_cpu(void) {
-  
-
-}
 
 /* 
 load_avg = (59/60)*load_avg + (1/60)*ready_threads
