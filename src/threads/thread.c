@@ -25,6 +25,13 @@
 static fixed_point_t load_avg;
 static int ready_threads;
 
+static void update_thread(struct thread *t, void *aux);
+static void recalculate_priority(struct thread *t);
+static int calculate_priority_thread(struct thread *t);
+static int calc_hundred_times_val(fixed_point_t field);
+static void recalculate_load_avg(void);
+static void recalculate_recent_cpu(struct thread *t, void *aux);
+
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -409,7 +416,7 @@ thread_foreach (thread_action_func *func, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY.
    Yields if no longer the highest priority thread. */
-void update_thread(struct thread *t, void *aux) {
+static void update_thread(struct thread *t, void *aux) {
   recalculate_recent_cpu(t, NULL);
   recalculate_priority(t);
   reinsert(t);
@@ -436,13 +443,13 @@ thread_set_priority (int new_priority)
   }
 }
 
-void recalculate_priority(struct thread *t) {
+static void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
 }
 
 /* I did not use fixed points since 
 there are no other real num involved */
-int calculate_priority_thread(struct thread *t) {
+static int calculate_priority_thread(struct thread *t) {
   fixed_point_t fixed_point_term2 = FIXED_POINT_DIVIDE_INT(t->recent_cpu, 4);
   int result = PRI_MAX - 
                (FIXED_POINT_TO_INT(fixed_point_term2)) - 
@@ -504,7 +511,7 @@ thread_get_recent_cpu (void)
 }
 
 /* Takes in field which is in fixed point and returns 100 times its actual value */ 
-int calc_hundred_times_val(fixed_point_t field) {
+static int calc_hundred_times_val(fixed_point_t field) {
   fixed_point_t fixed_point_val = FIXED_POINT_MULTIPLY_INT(field, 100);
   int result = FIXED_POINT_TO_INT(fixed_point_val);
 
@@ -522,7 +529,7 @@ First multiplies 59 by load_avg fixed point
 Then adds it to 60*ready_thread
 then divides by 60 
 */
-void recalculate_load_avg(void) {
+static void recalculate_load_avg(void) {
   fixed_point_t result = FIXED_POINT_MULTIPLY_INT(load_avg, 59);
   result = FIXED_POINT_ADD_INT(result, ready_threads);
   result = FIXED_POINT_DIVIDE_INT(result, 60);
@@ -537,7 +544,7 @@ Then divides them together to find coefficient, since multipling can led to over
 Then multiplies by recent_cpu
 Lastly adds nice
 */
-void recalculate_recent_cpu(struct thread *t, void *aux) {
+static void recalculate_recent_cpu(struct thread *t, void *aux) {
   int nice = t->nice;
   fixed_point_t recent_cpu = t->recent_cpu;
   fixed_point_t numerator = FIXED_POINT_MULTIPLY_INT(load_avg, 2);
