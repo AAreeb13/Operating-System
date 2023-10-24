@@ -372,9 +372,7 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
-  if (!list_empty(&ready_list)) {
-    yield_if_lower();
-  }
+  yield_if_lower();
 }
 
 /* Returns the current thread's priority. */
@@ -629,4 +627,12 @@ bool priority_list_less_func(const struct list_elem *a,
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
   return thread_a -> priority > thread_b -> priority;
+}
+
+bool priority_less_func(const struct list_elem *a,
+                        const struct list_elem *b,
+                        void *aux UNUSED) {
+  struct thread *thread_a = list_entry(a, struct thread, elem);
+  struct thread *thread_b = list_entry(b, struct thread, elem);
+  return thread_a -> priority < thread_b -> priority;
 }
