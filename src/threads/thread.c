@@ -161,25 +161,15 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE) {
-    // 
-    if (thread_mlfqs) {
-      insert_and_increment();
-      recalculate();
-    }
-    intr_yield_on_return ();
-  } else {
-    /* 
-    Check if timer_ticks % TIME_FREQ == 0
-    Do all the recalculating and reordering
-
-    Check if timer_tick % TIME_SLICE == 0
-    In that case, update the priorities of all the threads that ran and empty the running thread list
-    
-    */
-
+  if (thread_mlfqs) {
+    insert_and_increment();
+    recalculate();
   }
+
+  /* Enforce preemption. */
+  if (++thread_ticks >= TIME_SLICE)
+    intr_yield_on_return ();
+
   yield_if_lower();
 }
 
