@@ -65,9 +65,6 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-mlfqs". */
 bool thread_mlfqs;
 
-/* Array of mlfqs for BSD */
-struct list arr_of_queues[64];
-
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -105,13 +102,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  if (thread_mlfqs) {
-    for (int i = 0; i < 64; i++) {
-      list_init(&arr_of_queues[i]);
-    }
-  } else {
-    list_init (&ready_list);
-  }
+  list_init (&ready_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -757,7 +748,7 @@ static void insert_and_increment(void) {
   struct thread *cur = thread_current();
 
   if (!is_idle_thread(cur)) {
-    cur->recent_cpu_100 += 100;
+    FIXED_POINT_ADD_INT(cur->recent_cpu, 1);
 
     bool already_in_list = false;
     index j = 0;
@@ -778,13 +769,13 @@ static void insert_and_increment(void) {
 static void recalculate(void) {
   if (timer_ticks() % TIMER_FREQ == 0) {
     recalculate_load_avg();
-    thread_foreach(&thread_calculate_priority, NULL);
+    thread_foreach(&update_thread, NULL);
     for (int i = 0; i < 4; i++) {
       ran_threads[i] = NULL;
     }
   } else if (timer_ticks() % TIME_SLICE == 0) {
     for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
-      thread_calculate_priority(ran_threads[i]);
+      recalculate_priority(ran_threads[i]);
       ran_threads[i] = NULL;
     }
   }
