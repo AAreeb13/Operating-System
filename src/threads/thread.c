@@ -163,11 +163,22 @@ thread_tick (void)
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE) {
+    // 
     if (thread_mlfqs) {
       insert_and_increment();
       recalculate();
     }
     intr_yield_on_return ();
+  } else {
+    /* 
+    Check if timer_ticks % TIME_FREQ == 0
+    Do all the recalculating and reordering
+
+    Check if timer_tick % TIME_SLICE == 0
+    In that case, update the priorities of all the threads that ran and empty the running thread list
+    
+    */
+
   }
   yield_if_lower();
 }
@@ -245,6 +256,10 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  // At this point we need to check if new thread is higher or not
+  if (t->priority > thread_get_priority) {
+    thread_yield;
+  }
 
   return tid;
 }
@@ -407,6 +422,7 @@ thread_foreach (thread_action_func *func, void *aux)
 void update_thread(struct thread *t, void *aux) {
   recalculate_recent_cpu(t, NULL);
   recalculate_priority(t);
+  reinsert(t);
 }
 /* TODO remove NULL signature and add UNUSED flag*/
 
@@ -432,7 +448,6 @@ thread_set_priority (int new_priority)
 
 void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
-  reinsert(t);
 }
 
 /* I did not use fixed points since 
@@ -465,6 +480,7 @@ thread_set_nice (int new_nice)
   struct thread *t = thread_current();
   t->nice = new_nice;
   recalculate_priority(t);
+  yield_if_lower();
 
   /* Yield if no longer highest 
   We can implement a function that finds next thread
