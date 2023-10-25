@@ -72,7 +72,6 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
-  printf("d\n");
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
@@ -314,11 +313,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  printf("a\n");
   list_push_back (&cond->waiters, &waiter.elem);
-  printf("b\n");
   lock_release (lock);
-  printf("c\n");
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
 }
