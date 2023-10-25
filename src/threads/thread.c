@@ -254,10 +254,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  // At this point we need to check if new thread is higher or not
-  if (t->priority > thread_get_priority()) {
-    thread_yield();
-  }
+  yield_if_lower();
 
   return tid;
 }
@@ -385,8 +382,8 @@ thread_yield (void) {
 void yield_if_lower(void) {
   if (!list_empty(&ready_list)) {
     int first_elem_priority = list_entry(list_begin(&ready_list),
-    struct thread,
-    elem) -> priority;
+                                         struct thread,
+                                         elem) -> priority;
     if (thread_current()->priority < first_elem_priority) {
       if (intr_context()) {
         intr_yield_on_return();
@@ -396,7 +393,6 @@ void yield_if_lower(void) {
     }
   }
 }
-
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
@@ -767,9 +763,9 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* list_less_func for ordering by non-decreasing priority. */
-static bool priority_list_less_func(const struct list_elem *a,
-                                    const struct list_elem *b,
-                                    void *aux UNUSED) {
+bool priority_list_less_func(const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED) {
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
   return thread_a -> priority > thread_b -> priority;
