@@ -12,6 +12,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #include "lib/fixedpoint.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -30,7 +31,7 @@ static void recalculate_priority(struct thread *t);
 static int calculate_priority_thread(struct thread *t);
 static int calc_hundred_times_val(fixed_point_t field);
 static void recalculate_load_avg(void);
-static void recalculate_recent_cpu(struct thread *t, void *aux);
+static void recalculate_recent_cpu(struct thread *t, void *aux UNUSED);
 
 
 /* List of processes in THREAD_READY state, that is, processes
@@ -254,8 +255,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
   // At this point we need to check if new thread is higher or not
-  if (t->priority > thread_get_priority) {
-    thread_yield;
+  if (t->priority > thread_get_priority()) {
+    thread_yield();
   }
 
   return tid;
@@ -416,7 +417,7 @@ thread_foreach (thread_action_func *func, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY.
    Yields if no longer the highest priority thread. */
-static void update_thread(struct thread *t, void *aux) {
+static void update_thread(struct thread *t, void *aux UNUSED) {
   recalculate_recent_cpu(t, NULL);
   recalculate_priority(t);
   reinsert(t);
@@ -515,9 +516,9 @@ static int calc_hundred_times_val(fixed_point_t field) {
   fixed_point_t fixed_point_val = FIXED_POINT_MULTIPLY_INT(field, 100);
   int result = FIXED_POINT_TO_INT(fixed_point_val);
 
-  if (fixed_point_val > INT_MAX || fixed_point_val < INT_MIN) {
-    printf("THERE IS AN OVERFLOW IN CALC HUNDRED!");
-  } 
+  // if (fixed_point_val > INT_MAX || fixed_point_val < INT_MIN) {
+  //   printf("THERE IS AN OVERFLOW IN CALC HUNDRED!");
+  // } 
   return result;
 }
 
@@ -544,7 +545,7 @@ Then divides them together to find coefficient, since multipling can led to over
 Then multiplies by recent_cpu
 Lastly adds nice
 */
-static void recalculate_recent_cpu(struct thread *t, void *aux) {
+static void recalculate_recent_cpu(struct thread *t, void *aux UNUSED) {
   int nice = t->nice;
   fixed_point_t recent_cpu = t->recent_cpu;
   fixed_point_t numerator = FIXED_POINT_MULTIPLY_INT(load_avg, 2);
@@ -783,10 +784,10 @@ static void insert_and_increment(void) {
   struct thread *cur = thread_current();
 
   if (!is_idle_thread(cur)) {
-    FIXED_POINT_ADD_INT(cur->recent_cpu, 1);
+    cur->recent_cpu = FIXED_POINT_ADD_INT(cur->recent_cpu, 1);
 
     bool already_in_list = false;
-    index j = 0;
+    int j = 0;
     for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
       already_in_list = cur == ran_threads[i];
       if (already_in_list) {
@@ -802,7 +803,7 @@ static void insert_and_increment(void) {
 
 /* Recalculate load_avg and priority for necessary threads */
 static void recalculate(void) {
-  if (timer_ticks() % TIMER_FREQ == 0) {
+  if ((timer_ticks() % TIMER_FREQ) == 0) {
     recalculate_load_avg();
     thread_foreach(&update_thread, NULL);
     for (int i = 0; i < 4; i++) {
