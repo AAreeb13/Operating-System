@@ -88,9 +88,6 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-static bool priority_list_less_func(const struct list_elem *,
-                                    const struct list_elem *,
-                                    void *);
 static void insert_and_increment(void);
 static void recalculate(void);
 static void reinsert(struct thread *);
