@@ -216,8 +216,14 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  if (thread_current()->priority < priority) {
-    thread_yield();
+  if (!thread_mlfqs) {
+    if (thread_current()->effective_priority < priority) {
+      thread_yield();
+    }
+  } else {
+    if (thread_current()->priority < priority) {
+      thread_yield();
+    }
   }
 
   return tid;
@@ -334,16 +340,30 @@ thread_yield (void) {
 
 /* Yields the CPU if the current thread has a lower priority than a ready thread. */
 void yield_if_lower(void) {
-  if (!list_empty(&ready_list)) {
-    int first_elem_priority = list_entry(list_begin(&ready_list),
-                                         struct thread,
-                                         elem) -> priority;
-    if (thread_current()->priority < first_elem_priority) {
-      if (intr_context()) {
-        intr_yield_on_return();
-      } else {
-        thread_yield();
-      }
+  int current_priority;
+  int first_elem_priority;
+
+  if (list_empty(&ready_list)) {
+    return;
+  }
+
+  if(!thread_mlfqs) {
+    current_priority = thread_current()->effective_priority;
+    first_elem_priority = list_entry(list_begin(&ready_list),
+                                     struct thread,
+                                     elem) -> effective_priority;
+  } else {
+    current_priority = thread_current()->priority;
+    first_elem_priority = list_entry(list_begin(&ready_list),
+                                     struct thread,
+                                     elem) -> priority;
+  }
+
+  if (current_priority < first_elem_priority) {
+    if (intr_context()) {
+      intr_yield_on_return();
+    } else {
+      thread_yield();
     }
   }
 }
@@ -373,33 +393,16 @@ thread_set_priority (int new_priority)
 {
   thread_current ()->priority = new_priority;
 
-   if (!list_empty(&ready_list)) {
-    yield_if_lower();
-  }
-  
-  struct list_elem *ready_list_first_elem = list_begin(&ready_list);
-  int first_elem_priority;
-
   if (!thread_mlfqs) {
     int eff_priority = thread_current()->effective_priority;
-    thread_current()->effective_priority = MAX(new_priority,eff_priority);
-    first_elem_priority = list_entry(ready_list_first_elem,
-                                        struct thread,
-                                        elem)->effective_priority;
-
-    if (thread_current()->effective_priority < first_elem_priority) {
-      thread_yield();
-    }
-
-  } else {
-    first_elem_priority = list_entry(ready_list_first_elem,
-                                        struct thread,
-                                        elem)->priority;
-
-    if (new_priority < first_elem_priority) {
-      thread_yield();
+    if (list_empty(&thread_current()->donors)){
+      thread_current()->effective_priority = new_priority;
+    } else {
+    thread_current()->effective_priority = MAX(new_priority, eff_priority);
     }
   }
+
+  yield_if_lower();
 }
 
 /* Returns the current thread's priority. */
@@ -664,9 +667,9 @@ bool priority_list_less_func(const struct list_elem *a,
 
   if (!thread_mlfqs) {
     return thread_a->effective_priority > thread_b->effective_priority;
+  } else {
+    return thread_a->priority > thread_b->priority;
   }
-  return thread_a->priority > thread_b->priority;
-
 }
 void move_ready_thread(struct thread *t){
   list_remove(&t->elem);

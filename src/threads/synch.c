@@ -72,7 +72,7 @@ sema_down (struct semaphore *sema)
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
-
+  printf("d\n");
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
@@ -121,9 +121,12 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_max (&sema->waiters, priority_list_less_func, NULL),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)) {
+    struct list_elem *max = list_min(&sema->waiters, &priority_list_less_func, NULL);
+    list_remove(max);
+    thread_unblock(list_entry(max, struct thread, elem));
+  }
+
   sema->value++;
   intr_set_level (old_level);
   yield_if_lower();
@@ -311,8 +314,11 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
+  printf("a\n");
   list_push_back (&cond->waiters, &waiter.elem);
+  printf("b\n");
   lock_release (lock);
+  printf("c\n");
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
 }
@@ -334,8 +340,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
 
   if (!list_empty (&cond->waiters)) {
     struct list_elem *max = list_max(&cond->waiters, &sema_list_less_func, NULL);
-    sema_up(&list_entry(max,
-    struct semaphore_elem, elem)->semaphore);
+    sema_up(&list_entry(max, struct semaphore_elem, elem)->semaphore);
     list_remove(max);
   }
 
@@ -364,21 +369,20 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 // 3. change donee priority
 // 4. if ready, move in ready list
 // 4. if blocked, then
-void priority_donation(struct lock *lock) {
-  struct thread *donor = thread_current();
-  struct thread *donee = lock->holder;
 
+void priority_donation(struct lock *lock) {
   if (lock_try_acquire(lock)) {
     return;
   }
 
+  struct thread *donor = thread_current();
+  struct thread *donee = lock->holder;
+
   /* Store priority temporarily and implement donation. Put donor into donee's donor list. */
-  /* list_insert_ordered(&donee->donors, &donor->donor_elem, priority_list_less_func, NULL);
-  The above function is allowed only if we make pllf non-static. Insert > MAX for now. */
-  list_insert_ordered(&donee->donors, &donor->donor_elem, priority_list_less_func, NULL);
+  list_insert_ordered(&donee->donors, &donor->donor_elem, &priority_list_less_func, NULL);
   donee->effective_priority = MAX(donor->effective_priority,donee->effective_priority);
 
-  if(donee->status == THREAD_READY){
+  if (donee->status == THREAD_READY) {
     move_ready_thread(donee);
   } else if (donee->status == THREAD_BLOCKED) {
     // change priority
@@ -386,13 +390,13 @@ void priority_donation(struct lock *lock) {
   }
 
   sema_down(&lock->semaphore);
-
 }
 
 void return_priority(struct lock *lock) {
-  if (list_empty(&(lock->semaphore).waiters) || &thread_current()->donors){
+  if (list_empty(&(lock->semaphore).waiters) || list_empty(&thread_current()->donors)) {
     return;
   }
+
   for (struct list_elem *e = list_begin(&(lock->semaphore).waiters);
        e != list_end(&(lock->semaphore).waiters);
        e = list_next(e)) {
@@ -406,12 +410,14 @@ void return_priority(struct lock *lock) {
       }
     }
   }
+
   if (list_empty(&thread_current()->donors)) {
     thread_current()->effective_priority = thread_current()->priority;
-  }else {
+  } else {
     struct list_elem *highest_donor_elem = list_begin(&thread_current()->donors);
     thread_current()->effective_priority = list_entry(highest_donor_elem,struct thread, donor_elem)->effective_priority;
   }
+
   thread_set_priority(thread_current()->priority);
 
   // all threads in waiting list must be removed from donor list
@@ -433,6 +439,10 @@ static bool sema_list_less_func(const struct list_elem *a,
 
   struct thread *thread_a = list_entry(list_begin(waiters_a), struct thread, elem);
   struct thread *thread_b = list_entry(list_begin(waiters_b), struct thread, elem);
-
-  return thread_a->priority < thread_b->priority;
+  
+  if (!thread_mlfqs) {
+    return thread_a->effective_priority < thread_b->effective_priority;
+  } else {
+    return thread_a->priority < thread_b->priority;
+  }
 }
