@@ -23,8 +23,8 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
+/* load_avg in fixed point format. */
 static fixed_point_t load_avg;
-static int ready_threads;
 
 static void update_thread(struct thread *t, void *aux);
 static void recalculate_priority(struct thread *t);
@@ -42,7 +42,7 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
-/* Array of threads running in the current time slice */
+/* Array of threads that ran in the current time slice. */
 static struct thread *ran_threads[4];
 
 /* Idle thread. */
@@ -119,7 +119,6 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   if (thread_mlfqs) {
-    ready_threads = 1;
     load_avg = 0;
   }
   initial_thread->tid = allocate_tid ();
@@ -269,9 +268,6 @@ thread_block (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   thread_current ()->status = THREAD_BLOCKED;
-  if (thread_mlfqs) {
-    ready_threads--;
-  }
 
   schedule ();
 }
@@ -295,9 +291,6 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered (&ready_list, &t->elem, &priority_list_less_func, NULL);
   t->status = THREAD_READY;
-  if (thread_mlfqs) {
-    ready_threads++;
-  }
   intr_set_level (old_level);
 }
 
@@ -351,9 +344,6 @@ thread_exit (void)
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
-  if (thread_mlfqs) {
-    ready_threads--;
-  }
   schedule ();
   NOT_REACHED ();
 }

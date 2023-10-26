@@ -101,8 +101,8 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-    uint8_t nice;                       /* Nice number for BSD */
-    fixed_point_t recent_cpu;           /* Recent Cpu usage value*/
+    uint8_t nice;                       /* Nice number for BSD. */
+    fixed_point_t recent_cpu;           /* Recent Cpu usage value as fixed point. */
   };
 
 /* If false (default), use round-robin scheduler.
