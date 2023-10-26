@@ -417,10 +417,13 @@ void priority_donation(struct lock *lock){
   struct thread *donee = lock->holder;
   struct thread *donor = thread_current();
 
-  if (donee->status == THREAD_READY){
+  if (donee->status == THREAD_READY) {
     donee->effective_priority = donor->effective_priority;
-    list_push_back(&donee->donors,&donor->donorelem);
+
+  } else {
+    donee->effective_priority = MAX(donee->effective_priority, donor->effective_priority);
   }
+  list_push_back(&donee->donors,&donor->donorelem);
   sema_down (&lock->semaphore);
   /*
   struct list *waiters = &lock->semaphore.waiters;
