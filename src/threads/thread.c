@@ -525,7 +525,7 @@ then divides by 60
 */
 static void recalculate_load_avg(void) {
   fixed_point_t result = FIXED_POINT_MULTIPLY_INT(load_avg, 59);
-  result = FIXED_POINT_ADD_INT(result, ready_threads);
+  result = is_idle_thread(thread_current()) ? FIXED_POINT_ADD_INT(result, threads_ready()) : FIXED_POINT_ADD_INT(result, threads_ready() + 1);
   result = FIXED_POINT_DIVIDE_INT(result, 60);
   load_avg = result;
 }
