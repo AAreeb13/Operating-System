@@ -783,8 +783,10 @@ thread_set_effective_priority (void)
 {
   ASSERT(!thread_mlfqs);
   thread_current()->effective_priority = thread_current()->priority;
+  enum intr_level old_level = intr_disable();
   struct list_elem *highest_donor_thread_elem
       = list_min(&thread_current()->donors, &priority_list_less_func, NULL);
+  intr_set_level(old_level);
   struct thread *highest_donor_thread
       = list_entry(highest_donor_thread_elem, struct thread, donorelem);
   if (thread_current()->effective_priority < highest_donor_thread->effective_priority){
@@ -836,9 +838,12 @@ static void recalculate(void) {
 
 /* Reinserts the thread into the ready list after its priority has been recalculated. */
 void reinsert(struct thread *t) {
+  
   if (t->status == THREAD_READY) {
+    enum intr_level old_level = intr_disable();
     list_remove(&t->elem);
     list_insert_ordered(&ready_list, &t->elem, &priority_list_less_func, NULL);
+    intr_set_level(old_level);
   }
 }
 

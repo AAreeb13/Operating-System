@@ -213,10 +213,7 @@ lock_acquire (struct lock *lock)
   }
 
   sema_down (&lock->semaphore);
-  enum intr_level old_level = intr_disable();
   lock->holder = thread_current ();
-  intr_set_level(old_level);
-
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -244,6 +241,7 @@ lock_try_acquire (struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+   
 void
 lock_release (struct lock *lock) 
 {
@@ -251,14 +249,18 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!thread_mlfqs){
-    give_back_priority(lock);
+    give_back_priority(lock); 
+    /* As below, this thread returns priority right after the lock is released. */
   }
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
-void give_back_priority(struct lock *lock){
+
+/*  */
+void give_back_priority(struct lock *lock) {
   ASSERT(!thread_mlfqs);
-  if (list_empty(&lock->semaphore.waiters) || list_empty(&thread_current()->donors)) {
+  if (list_empty(&lock->semaphore.waiters)) {
     return;
   }
   struct list *donors = &thread_current()->donors;
@@ -271,7 +273,7 @@ void give_back_priority(struct lock *lock){
     struct thread, donorelem)->effective_priority;
   }
 }
-void remove_donors_if_in_waiters(struct list *donors, struct list *waiters){
+void remove_donors_if_in_waiters(struct list *donors, struct list *waiters) {
   struct list_elem *e = list_begin(waiters);
   struct thread *waiter;
   while (e != list_end(waiters)) {
@@ -290,6 +292,7 @@ void remove_donors_if_in_waiters(struct list *donors, struct list *waiters){
     e = list_next(e);
   }
 }
+
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
@@ -427,8 +430,9 @@ void priority_donation(struct lock *lock){
   } else {
     donee->effective_priority = MAX(donee->effective_priority, donor->effective_priority);
   }
-
+  enum intr_level old_level = intr_disable();
   list_push_back(&donee->donors,&donor->donorelem);
+  intr_set_level (old_level);
   sema_down (&lock->semaphore);
   if (!list_empty(&lock->semaphore.waiters)){
 
