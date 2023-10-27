@@ -270,7 +270,7 @@ real_time_delay (int64_t num, int32_t denom)
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
 
-/*The list_less_func for timer_sleep_list that compares the wake_time*/
+/* The list_less_func for timer_sleep_list that compares the wake_time. */
 static bool timer_list_less_func(const struct list_elem *a,
                                  const struct list_elem *b,
                                  void *aux UNUSED) {
@@ -279,7 +279,7 @@ static bool timer_list_less_func(const struct list_elem *a,
   return a_wake_time < b_wake_time;
 }
 
-/*Traverses the timer_sleep_list to wake the necessary threads*/
+/* Traverses the timer_sleep_list to wake the necessary threads. */
 static void wake_threads(void) {
   int64_t current_time = timer_ticks();
   struct list_elem *e;
