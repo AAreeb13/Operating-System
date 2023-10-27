@@ -26,6 +26,7 @@
 /* load_avg in fixed point format. */
 static fixed_point_t load_avg;
 
+/* newly added functions for BSD screduler */
 static void update_thread(struct thread *t, void *aux);
 static void recalculate_priority(struct thread *t);
 static int calculate_priority_thread(struct thread *t);
@@ -33,6 +34,8 @@ static int calc_hundred_times_val(fixed_point_t field);
 static void recalculate_load_avg(void);
 static void recalculate_recent_cpu(struct thread *t, void *aux UNUSED);
 
+/* Array of threads that ran in the current time slice. */
+static struct thread *ran_threads[4];
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -41,9 +44,6 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
-
-/* Array of threads that ran in the current time slice. */
-static struct thread *ran_threads[4];
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -365,7 +365,8 @@ thread_yield (void) {
   intr_set_level (old_level);
 }
 
-/* Yields the CPU if the current thread has a lower priority than a ready thread. */
+/* Only yields the thread if the current thread 
+has a lower priority than highest priority ready thread. */
 void yield_if_lower(void) {
   int current_priority;
   int first_elem_priority;
@@ -438,8 +439,7 @@ static void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
 }
 
-/* I did not use fixed points since
-there are no other real num involved */
+/* Calculates a threads priority using recent_cpu using fixed point arithmetic */
 static int calculate_priority_thread(struct thread *t) {
   fixed_point_t fixed_point_term2 = FIXED_POINT_DIVIDE_INT(t->recent_cpu, 4);
   int result = PRI_MAX -
@@ -455,7 +455,8 @@ static int calculate_priority_thread(struct thread *t) {
 }
 
 
-/* Returns the current thread's priority. */
+/* Returns the current thread's priority, 
+effective priority in donation and base in BSD */
 int
 thread_get_priority (void) 
 {
@@ -466,7 +467,8 @@ thread_get_priority (void)
   }
 }
 
-/* Sets the current thread's nice value to NICE. */
+/* Sets the current thread's nice value to NICE 
+and yields if its priority is lower than highest priority ready thread */
 void
 thread_set_nice (int new_nice)
 {
@@ -474,13 +476,6 @@ thread_set_nice (int new_nice)
   t->nice = new_nice;
   recalculate_priority(t);
   yield_if_lower();
-
-  /* Yield if no longer highest
-  We can implement a function that finds next thread
-  and checks if that threads priority is same as our one
-  If it is same or lower, then we run, otherwise we yield
-
-  We can also have the next ready to run thread calculated beforehand*/
 }
 
 /* Returns the current thread's nice value. */
