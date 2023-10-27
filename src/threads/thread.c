@@ -370,7 +370,8 @@ has a lower priority than highest priority ready thread. */
 void yield_if_lower(void) {
   int current_priority;
   int first_elem_priority;
-
+  enum intr_level old_level = INTR_OFF;
+  
   if (list_empty(&ready_list)) {
     return;
   }
@@ -413,6 +414,8 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* Used in recalculate function to update 
+recent_cpu and priority of all threads per sec */
 static void update_thread(struct thread *t, void *aux UNUSED) {
   recalculate_recent_cpu(t, NULL);
   recalculate_priority(t);
@@ -422,19 +425,17 @@ static void update_thread(struct thread *t, void *aux UNUSED) {
 
 /* Sets the current thread's priority to NEW_PRIORITY.
    Yields if no longer the highest priority thread. */
-
 void
 thread_set_priority (int new_priority) 
 {
   if (!thread_mlfqs) {
     thread_current ()->priority = new_priority;
     thread_set_effective_priority();
-    if(!list_empty(&ready_list)) {
-      yield_if_lower();
-    }
+    yield_if_lower();
   }
 }
 
+/* Sets priority of thread to new calculation*/
 static void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
 }
@@ -506,20 +507,13 @@ static int calc_hundred_times_val(fixed_point_t field) {
   fixed_point_t fixed_point_val = FIXED_POINT_MULTIPLY_INT(field, 100);
   int result = FIXED_POINT_TO_INT(fixed_point_val);
 
-  // if (fixed_point_val > INT_MAX || fixed_point_val < INT_MIN) {
-  //   printf("THERE IS AN OVERFLOW IN CALC HUNDRED!");
-  // }
   return result;
 }
 
 
-/*
+/* Recalculates load_avg and sets the new value to load_avg
 load_avg = (59/60)*load_avg + (1/60)*ready_threads
-= 1/60 (59*load_avg + ready_threads)
-First multiplies 59 by load_avg fixed point
-Then adds it to 60*ready_thread
-then divides by 60
-*/
+= 1/60 (59*load_avg + ready_threads) */
 static void recalculate_load_avg(void) {
   fixed_point_t result = FIXED_POINT_MULTIPLY_INT(load_avg, 59);
   result = is_idle_thread(thread_current()) ? FIXED_POINT_ADD_INT(result, threads_ready()) : FIXED_POINT_ADD_INT(result, threads_ready() + 1);
@@ -527,14 +521,8 @@ static void recalculate_load_avg(void) {
   load_avg = result;
 }
 
-/*
-recent_cpu = (2*load_avg )/(2*load_avg + 1) * recent_cpu + nice
-First calculate 2*load_avg
-Then 2*load_avg + 1
-Then divides them together to find coefficient, since multipling can led to overflow
-Then multiplies by recent_cpu
-Lastly adds nice
-*/
+/* Recalculates a thread's recent_cpu and sets its recent_cpu to new val
+recent_cpu = (2*load_avg )/(2*load_avg + 1) * recent_cpu + nice */
 static void recalculate_recent_cpu(struct thread *t, void *aux UNUSED) {
   int nice = t->nice;
   fixed_point_t recent_cpu = t->recent_cpu;
@@ -546,6 +534,88 @@ static void recalculate_recent_cpu(struct thread *t, void *aux UNUSED) {
   t->recent_cpu = result;
 }
 
+/* Insert current thread in ran_threads if not already in array 
+and increment its recent_cpu unless idle_thread. Called each tick */
+static void insert_and_increment(void) {
+  struct thread *cur = thread_current();
+
+  if (!is_idle_thread(cur)) {
+    cur->recent_cpu = FIXED_POINT_ADD_INT(cur->recent_cpu, 1);
+
+    bool already_in_list = false;
+    int j = 0;
+    for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
+      already_in_list = cur == ran_threads[i];
+      if (already_in_list) {
+        break;
+      }
+      j++;
+    }
+    if (!already_in_list) {
+      ran_threads[j] = cur;
+    }
+  }
+}
+
+
+/* Called each 4 ticks to recalculate 
+and updates load_avg, recent_cpu and priority */
+static void recalculate(void) {
+  if ((timer_ticks() % TIMER_FREQ) == 0) {
+    recalculate_load_avg();
+    thread_foreach(&update_thread, NULL);
+    for (int i = 0; i < 4; i++) {
+      ran_threads[i] = NULL;
+    }
+  } else if (timer_ticks() % TIME_SLICE == 0) {
+    for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
+      recalculate_priority(ran_threads[i]);
+      ran_threads[i] = NULL;
+    }
+  }
+}
+
+/* Reinserts the thread into the ready list 
+after its priority has been recalculated. */
+void reinsert(struct thread *t) {
+  
+  if (t->status == THREAD_READY) {
+    enum intr_level old_level = intr_disable();
+    list_remove(&t->elem);
+    list_insert_ordered(&ready_list, &t->elem, &priority_list_less_func, NULL);
+    intr_set_level(old_level);
+  }
+}
+
+/* list_less_func for ordering by non-decreasing priority. */
+bool priority_list_less_func(const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED) {
+  struct thread *thread_a = list_entry(a, struct thread, elem);
+  struct thread *thread_b = list_entry(b, struct thread, elem);
+
+  if (!thread_mlfqs) {
+    return thread_a->effective_priority > thread_b->effective_priority;
+  }
+  return thread_a -> priority > thread_b -> priority;
+}
+
+/* Set current threads effective priority to max of base and donated priorities. */
+void
+thread_set_effective_priority (void)
+{
+  ASSERT(!thread_mlfqs);
+  thread_current()->effective_priority = thread_current()->priority;
+  enum intr_level old_level = intr_disable();
+  struct list_elem *highest_donor_thread_elem
+      = list_min(&thread_current()->donors, &priority_list_less_func, NULL);
+  intr_set_level(old_level);
+  struct thread *highest_donor_thread
+      = list_entry(highest_donor_thread_elem, struct thread, donorelem);
+  if (thread_current()->effective_priority < highest_donor_thread->effective_priority){
+    thread_current()->effective_priority = highest_donor_thread->effective_priority;
+  }
+}
 
 
 
@@ -760,86 +830,7 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/* list_less_func for ordering by non-decreasing priority. */
-bool priority_list_less_func(const struct list_elem *a,
-                             const struct list_elem *b,
-                             void *aux UNUSED) {
-  struct thread *thread_a = list_entry(a, struct thread, elem);
-  struct thread *thread_b = list_entry(b, struct thread, elem);
-
-  if (!thread_mlfqs) {
-    return thread_a->effective_priority > thread_b->effective_priority;
-  }
-  return thread_a -> priority > thread_b -> priority;
-}
-
-void
-thread_set_effective_priority (void)
-{
-  ASSERT(!thread_mlfqs);
-  thread_current()->effective_priority = thread_current()->priority;
-  enum intr_level old_level = intr_disable();
-  struct list_elem *highest_donor_thread_elem
-      = list_min(&thread_current()->donors, &priority_list_less_func, NULL);
-  intr_set_level(old_level);
-  struct thread *highest_donor_thread
-      = list_entry(highest_donor_thread_elem, struct thread, donorelem);
-  if (thread_current()->effective_priority < highest_donor_thread->effective_priority){
-    thread_current()->effective_priority = highest_donor_thread->effective_priority;
-  }
-}
-
 bool is_idle_thread(struct thread *t) {
   return t == idle_thread;
 }
-
-/* Insert current thread in ran_threads if not already in array and increment its recent_cpu unless idle_thread. */
-static void insert_and_increment(void) {
-  struct thread *cur = thread_current();
-
-  if (!is_idle_thread(cur)) {
-    cur->recent_cpu = FIXED_POINT_ADD_INT(cur->recent_cpu, 1);
-
-    bool already_in_list = false;
-    int j = 0;
-    for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
-      already_in_list = cur == ran_threads[i];
-      if (already_in_list) {
-        break;
-      }
-      j++;
-    }
-    if (!already_in_list) {
-      ran_threads[j] = cur;
-    }
-  }
-}
-
-/* Recalculate load_avg and priority for necessary threads */
-static void recalculate(void) {
-  if ((timer_ticks() % TIMER_FREQ) == 0) {
-    recalculate_load_avg();
-    thread_foreach(&update_thread, NULL);
-    for (int i = 0; i < 4; i++) {
-      ran_threads[i] = NULL;
-    }
-  } else if (timer_ticks() % TIME_SLICE == 0) {
-    for (int i = 0; i < 4 && ran_threads[i] != NULL; i++) {
-      recalculate_priority(ran_threads[i]);
-      ran_threads[i] = NULL;
-    }
-  }
-}
-
-/* Reinserts the thread into the ready list after its priority has been recalculated. */
-void reinsert(struct thread *t) {
-  
-  if (t->status == THREAD_READY) {
-    enum intr_level old_level = intr_disable();
-    list_remove(&t->elem);
-    list_insert_ordered(&ready_list, &t->elem, &priority_list_less_func, NULL);
-    intr_set_level(old_level);
-  }
-}
-
 

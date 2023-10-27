@@ -93,8 +93,8 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct list_elem donorelem;
-    struct list donors;
+    struct list_elem donorelem;         /* List element for inserting into list donors*/
+    struct list donors;                 /* List of all the donors who donated to this thread */
     int effective_priority;
 
 #ifdef USERPROG
