@@ -370,7 +370,6 @@ has a lower priority than highest priority ready thread. */
 void yield_if_lower(void) {
   int current_priority;
   int first_elem_priority;
-  enum intr_level old_level = INTR_OFF;
   
   if (list_empty(&ready_list)) {
     return;
