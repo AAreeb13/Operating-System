@@ -209,7 +209,6 @@ lock_acquire (struct lock *lock)
 
   if (!thread_mlfqs) {
     priority_donation(lock); 
-    /*  */
     return;
   }
 
@@ -268,22 +267,27 @@ void give_back_priority(struct lock *lock) {
   struct list *donors = &thread_current()->donors;
   struct list *waiters = &lock->semaphore.waiters;
   remove_donors_if_in_waiters(donors, waiters);
+
   if (list_empty(donors)) {
     thread_current()->effective_priority = thread_current()->priority;
   } else {
     thread_current()->effective_priority = list_entry(list_min(donors, &priority_list_less_func, NULL),
     struct thread, donorelem)->effective_priority;
   }
+
 }
 
-/* The sole purpose of this function is to make sure that the correct next effective_priority is taken by
-   the current thread  */
+/* The sole purpose of this function is to make sure that the correct next 
+   effective_priority is taken by the current thread. Done by making sure 
+   threads that have no affiliation to the current thread are removed.  */
 void remove_donors_if_in_waiters(struct list *donors, struct list *waiters) {
   struct list_elem *e = list_begin(waiters);
   struct thread *waiter;
+
   while (e != list_end(waiters)) {
     waiter = list_entry(e, struct thread, elem);
     struct thread *donor;
+
     enum intr_level old_level = intr_disable();
     struct list_elem *e_ = list_begin(donors);
 
@@ -405,7 +409,7 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
-/* list_less_func for semaphores which compares the highest priority thread in its waiters */
+/* list_less_func for semaphores which compares the highest priority thread in its waiters. */
 static bool sema_list_less_func(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux UNUSED) {
@@ -420,6 +424,8 @@ static bool sema_list_less_func(const struct list_elem *a,
 
   return thread_a->priority < thread_b->priority;
 }
+
+/* Priority is given to the lock->holder. */
 void priority_donation(struct lock *lock) {
   ASSERT(!thread_mlfqs);
   bool success = lock_try_acquire(lock);
@@ -433,6 +439,8 @@ void priority_donation(struct lock *lock) {
   if (donee->status == THREAD_READY) {
     donee->effective_priority = donor->effective_priority;
     reinsert(donee);
+    /*A ready thread has more predictable behaviour since the ready_list
+      is visible to all threads. */
   } else {
     donee->effective_priority = MAX(donee->effective_priority, donor->effective_priority);
   }
@@ -442,13 +450,13 @@ void priority_donation(struct lock *lock) {
   intr_set_level (old_level);
   sema_down (&lock->semaphore);
 
-  if (!list_empty(&lock->semaphore.waiters)){
+  if (!list_empty(&lock->semaphore.waiters)) {
 
     /*inherit_donors(&lock->semaphore.waiters);*/ /*Faulty Function*/
 
     thread_set_priority(thread_current()->priority);
   }
-  lock->holder = thread_current ();
+  lock->holder = thread_current();
 }
 
 /* This thread is commented out, however it is a potential solution to preserving priority. */
