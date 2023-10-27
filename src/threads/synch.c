@@ -38,6 +38,7 @@ static bool sema_list_less_func(const struct list_elem *,
 static void priority_donation(struct lock *);
 static void give_back_priority(struct lock *);
 static void remove_donors_if_in_waiters(struct list *, struct list *);
+/*static void inherit_donors(struct list *);*/
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -213,7 +214,10 @@ lock_acquire (struct lock *lock)
   }
 
   sema_down (&lock->semaphore);
+  enum intr_level old_level = intr_disable();
   lock->holder = thread_current ();
+  intr_set_level(old_level);
+
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -419,24 +423,26 @@ void priority_donation(struct lock *lock){
 
   if (donee->status == THREAD_READY) {
     donee->effective_priority = donor->effective_priority;
-
   } else {
     donee->effective_priority = MAX(donee->effective_priority, donor->effective_priority);
   }
+
   list_push_back(&donee->donors,&donor->donorelem);
   sema_down (&lock->semaphore);
-  /*
-  struct list *waiters = &lock->semaphore.waiters;
+  if (!list_empty(&lock->semaphore.waiters)){
+
+    /*inherit_donors(&lock->semaphore.waiters);*/
+    thread_set_priority(thread_current()->priority);
+  }
+  lock->holder = thread_current ();
+}
+/*
+void inherit_donors(struct list *waiters) {
+  ASSERT(!list_empty(waiters));
   struct list_elem *e = list_begin(waiters);
   while ( e != list_end(waiters)){
     struct list_elem donor_elem = list_entry(e, struct thread, elem)->donorelem;
     list_push_back(&thread_current()->donors, &donor_elem);
     e = list_next(e);
   }
-  */
-
-  lock->holder = thread_current ();
-}
-void inherit_donee(struct lock *) {
-
-}
+}*/
