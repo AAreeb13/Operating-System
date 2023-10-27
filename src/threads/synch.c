@@ -30,12 +30,15 @@
 #include <stdio.h>
 #include <string.h>
 #include "threads/interrupt.h"
-#include "threads/thread.h"
+#include "../threads/thread.h"
 
 static bool sema_list_less_func(const struct list_elem *,
                                 const struct list_elem *,
                                 void *);
-
+static void priority_donation(struct lock *);
+static void give_back_priority(struct lock *);
+static void remove_donors_if_in_waiters(struct list *, struct list *);
+/*static void inherit_donors(struct list *);*/
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -204,6 +207,12 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  if (!thread_mlfqs) {
+    priority_donation(lock); 
+    /*  */
+    return;
+  }
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -233,14 +242,61 @@ lock_try_acquire (struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+   
 void
 lock_release (struct lock *lock) 
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  if (!thread_mlfqs){
+    give_back_priority(lock); 
+    /* As below, this thread returns priority right after the lock is released. */
+  }
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+}
+
+/* Returns priority and getting the MAX priority in the donor list. If the 
+   list is empty then effective_priority <- base_priority. */
+void give_back_priority(struct lock *lock) {
+  ASSERT(!thread_mlfqs);
+  if (list_empty(&lock->semaphore.waiters)) {
+    return;
+  }
+  struct list *donors = &thread_current()->donors;
+  struct list *waiters = &lock->semaphore.waiters;
+  remove_donors_if_in_waiters(donors, waiters);
+  if (list_empty(donors)) {
+    thread_current()->effective_priority = thread_current()->priority;
+  } else {
+    thread_current()->effective_priority = list_entry(list_min(donors, &priority_list_less_func, NULL),
+    struct thread, donorelem)->effective_priority;
+  }
+}
+
+/* The sole purpose of this function is to make sure that the correct next effective_priority is taken by
+   the current thread  */
+void remove_donors_if_in_waiters(struct list *donors, struct list *waiters) {
+  struct list_elem *e = list_begin(waiters);
+  struct thread *waiter;
+  while (e != list_end(waiters)) {
+    waiter = list_entry(e, struct thread, elem);
+    struct thread *donor;
+    enum intr_level old_level = intr_disable();
+    struct list_elem *e_ = list_begin(donors);
+
+    while (e_ != list_end(donors)) {
+      donor = list_entry(e_, struct thread, donorelem);
+      if (donor == waiter) {
+        list_remove(e_);
+      }
+      e_ = list_next(e_);
+    }
+    intr_set_level (old_level);
+    e = list_next(e);
+  }
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -364,3 +420,45 @@ static bool sema_list_less_func(const struct list_elem *a,
 
   return thread_a->priority < thread_b->priority;
 }
+void priority_donation(struct lock *lock) {
+  ASSERT(!thread_mlfqs);
+  bool success = lock_try_acquire(lock);
+  if(success){
+    return;
+  }
+
+  struct thread *donee = lock->holder;
+  struct thread *donor = thread_current();
+
+  if (donee->status == THREAD_READY) {
+    donee->effective_priority = donor->effective_priority;
+    reinsert(donee);
+  } else {
+    donee->effective_priority = MAX(donee->effective_priority, donor->effective_priority);
+  }
+
+  enum intr_level old_level = intr_disable();
+  list_push_back(&donee->donors,&donor->donorelem);
+  intr_set_level (old_level);
+  sema_down (&lock->semaphore);
+
+  if (!list_empty(&lock->semaphore.waiters)){
+
+    /*inherit_donors(&lock->semaphore.waiters);*/ /*Faulty Function*/
+
+    thread_set_priority(thread_current()->priority);
+  }
+  lock->holder = thread_current ();
+}
+
+/* This thread is commented out, however it is a potential solution to preserving priority. */
+/*
+void inherit_donors(struct list *waiters) {
+  ASSERT(!list_empty(waiters));
+  struct list_elem *e = list_begin(waiters);
+  while ( e != list_end(waiters)){
+    struct list_elem donor_elem = list_entry(e, struct thread, elem)->donorelem;
+    list_push_back(&thread_current()->donors, &donor_elem);
+    e = list_next(e);
+  }
+}*/

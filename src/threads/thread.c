@@ -90,7 +90,7 @@ static tid_t allocate_tid (void);
 
 static void insert_and_increment(void);
 static void recalculate(void);
-static void reinsert(struct thread *);
+void reinsert(struct thread *);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -367,16 +367,30 @@ thread_yield (void) {
 
 /* Yields the CPU if the current thread has a lower priority than a ready thread. */
 void yield_if_lower(void) {
-  if (!list_empty(&ready_list)) {
-    int first_elem_priority = list_entry(list_begin(&ready_list),
-                                         struct thread,
-                                         elem) -> priority;
-    if (thread_current()->priority < first_elem_priority) {
-      if (intr_context()) {
-        intr_yield_on_return();
-      } else {
-        thread_yield();
-      }
+  int current_priority;
+  int first_elem_priority;
+
+  if (list_empty(&ready_list)) {
+    return;
+  }
+
+  if(!thread_mlfqs) {
+    current_priority = thread_current()->effective_priority;
+    first_elem_priority = list_entry(list_begin(&ready_list),
+                                     struct thread,
+                                     elem) -> effective_priority;
+  } else {
+    current_priority = thread_current()->priority;
+    first_elem_priority = list_entry(list_begin(&ready_list),
+                                     struct thread,
+                                     elem) -> priority;
+  }
+
+  if (current_priority < first_elem_priority) {
+    if (intr_context()) {
+      intr_yield_on_return();
+    } else {
+      thread_yield();
     }
   }
 }
@@ -398,31 +412,24 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY.
-   Yields if no longer the highest priority thread. */
 static void update_thread(struct thread *t, void *aux UNUSED) {
   recalculate_recent_cpu(t, NULL);
   recalculate_priority(t);
   reinsert(t);
 }
-/* TODO remove NULL signature and add UNUSED flag*/
+
+
+/* Sets the current thread's priority to NEW_PRIORITY.
+   Yields if no longer the highest priority thread. */
 
 void
 thread_set_priority (int new_priority) 
 {
   if (!thread_mlfqs) {
     thread_current ()->priority = new_priority;
-    if (list_empty(&ready_list)) {
-      return;
-    }
-
-    struct list_elem *ready_list_first_elem = list_begin(&ready_list);
-    int first_elem_priority = list_entry(ready_list_first_elem,
-                                         struct thread,
-                                         elem) -> priority;
-
-    if (new_priority < first_elem_priority) {
-      thread_yield();
+    thread_set_effective_priority();
+    if(!list_empty(&ready_list)) {
+      yield_if_lower();
     }
   }
 }
@@ -431,12 +438,12 @@ static void recalculate_priority(struct thread *t) {
   t->priority = calculate_priority_thread(t);
 }
 
-/* I did not use fixed points since 
+/* I did not use fixed points since
 there are no other real num involved */
 static int calculate_priority_thread(struct thread *t) {
   fixed_point_t fixed_point_term2 = FIXED_POINT_DIVIDE_INT(t->recent_cpu, 4);
-  int result = PRI_MAX - 
-               (FIXED_POINT_TO_INT(fixed_point_term2)) - 
+  int result = PRI_MAX -
+               (FIXED_POINT_TO_INT(fixed_point_term2)) -
                (2 * t->nice);
   if (result > PRI_MAX) {
     return PRI_MAX;
@@ -447,27 +454,32 @@ static int calculate_priority_thread(struct thread *t) {
   }
 }
 
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  if (!thread_mlfqs) {
+    return thread_current()->effective_priority;
+  } else {
+    return thread_current()->priority;
+  }
 }
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int new_nice) 
+thread_set_nice (int new_nice)
 {
   struct thread *t = thread_current();
   t->nice = new_nice;
   recalculate_priority(t);
   yield_if_lower();
 
-  /* Yield if no longer highest 
+  /* Yield if no longer highest
   We can implement a function that finds next thread
   and checks if that threads priority is same as our one
   If it is same or lower, then we run, otherwise we yield
-  
+
   We can also have the next ready to run thread calculated beforehand*/
 }
 
@@ -485,7 +497,7 @@ thread_get_load_avg (void)
   return calc_hundred_times_val(load_avg);
 }
 
-/* Returns 100 times the current thread's recent_cpu value. 
+/* Returns 100 times the current thread's recent_cpu value.
 It does it by doing fixed point calculations.
 */
 int
@@ -494,24 +506,24 @@ thread_get_recent_cpu (void)
   return calc_hundred_times_val(thread_current()->recent_cpu);
 }
 
-/* Takes in field which is in fixed point and returns 100 times its actual value */ 
+/* Takes in field which is in fixed point and returns 100 times its actual value */
 static int calc_hundred_times_val(fixed_point_t field) {
   fixed_point_t fixed_point_val = FIXED_POINT_MULTIPLY_INT(field, 100);
   int result = FIXED_POINT_TO_INT(fixed_point_val);
 
   // if (fixed_point_val > INT_MAX || fixed_point_val < INT_MIN) {
   //   printf("THERE IS AN OVERFLOW IN CALC HUNDRED!");
-  // } 
+  // }
   return result;
 }
 
 
-/* 
+/*
 load_avg = (59/60)*load_avg + (1/60)*ready_threads
 = 1/60 (59*load_avg + ready_threads)
 First multiplies 59 by load_avg fixed point
 Then adds it to 60*ready_thread
-then divides by 60 
+then divides by 60
 */
 static void recalculate_load_avg(void) {
   fixed_point_t result = FIXED_POINT_MULTIPLY_INT(load_avg, 59);
@@ -628,6 +640,10 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  if (!thread_mlfqs) {
+    t->effective_priority = priority;
+    list_init (&t->donors); // Initialises donors list for each thread.
+  }
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -755,7 +771,27 @@ bool priority_list_less_func(const struct list_elem *a,
                              void *aux UNUSED) {
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
+
+  if (!thread_mlfqs) {
+    return thread_a->effective_priority > thread_b->effective_priority;
+  }
   return thread_a -> priority > thread_b -> priority;
+}
+
+void
+thread_set_effective_priority (void)
+{
+  ASSERT(!thread_mlfqs);
+  thread_current()->effective_priority = thread_current()->priority;
+  enum intr_level old_level = intr_disable();
+  struct list_elem *highest_donor_thread_elem
+      = list_min(&thread_current()->donors, &priority_list_less_func, NULL);
+  intr_set_level(old_level);
+  struct thread *highest_donor_thread
+      = list_entry(highest_donor_thread_elem, struct thread, donorelem);
+  if (thread_current()->effective_priority < highest_donor_thread->effective_priority){
+    thread_current()->effective_priority = highest_donor_thread->effective_priority;
+  }
 }
 
 bool is_idle_thread(struct thread *t) {
@@ -801,9 +837,14 @@ static void recalculate(void) {
 }
 
 /* Reinserts the thread into the ready list after its priority has been recalculated. */
-static void reinsert(struct thread *t) {
+void reinsert(struct thread *t) {
+  
   if (t->status == THREAD_READY) {
+    enum intr_level old_level = intr_disable();
     list_remove(&t->elem);
     list_insert_ordered(&ready_list, &t->elem, &priority_list_less_func, NULL);
+    intr_set_level(old_level);
   }
 }
+
+
