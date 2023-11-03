@@ -5,6 +5,8 @@
 #include "threads/thread.h"
 
 static void syscall_handler (struct intr_frame *);
+static void access_user_mem (uint32_t *, const void *);
+static void exit(void);
 
 void
 syscall_init (void) 
@@ -17,4 +19,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   printf ("system call!\n");
   thread_exit ();
+}
+
+static void access_user_mem (uint32_t *pd, const void *uaddr) {
+  if (uaddr != NULL && is_user_vaddr (uaddr)) {
+    pagedir_get_page(pd, uaddr);
+  } else {
+    exit();
+  }
 }
