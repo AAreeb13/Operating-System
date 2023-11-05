@@ -21,9 +21,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   thread_exit ();
 }
 
-static void access_user_mem (uint32_t *pd, const void *uaddr) {
+static void access_user_mem (const void *uaddr) {
   if (uaddr != NULL && is_user_vaddr (uaddr)) {
-    pagedir_get_page(pd, uaddr);
+    pagedir_get_page(thread_current()->pagedir, uaddr);
   } else {
     exit();
   }
