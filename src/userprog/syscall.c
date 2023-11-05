@@ -72,54 +72,67 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_HALT:
       sys_halt();
       break;
+
     case SYS_EXIT:
       syscall_args_check(syscall_num, 1);
       sys_exit(NULL);
       break;
+
     case SYS_EXEC:
       syscall_args_check(syscall_num, 1);
       result = sys_exec(NULL);
       break;
+
     case SYS_WAIT:
       syscall_args_check(syscall_num, 1);
       result = sys_wait(NULL);
       break;
+
     case SYS_CREATE:
       syscall_args_check(syscall_num, 2);
       result = sys_create(NULL, NULL);
       break;
+
     case SYS_REMOVE:
       syscall_args_check(syscall_num, 1);
       result = sys_remove(NULL);
       break;
+
     case SYS_OPEN:
       syscall_args_check(syscall_num, 1);
       result = sys_open(NULL);
       break;
+
     case SYS_FILESIZE:
       syscall_args_check(syscall_num, 1);
       result = sys_filesize(NULL);
       break;
+
     case SYS_READ:
       syscall_args_check(syscall_num, 3);
       result = sys_read(NULL, NULL, NULL);
       break;
+
     case SYS_WRITE:
       syscall_args_check(syscall_num, 3);
       result = sys_write(NULL, NULL, NULL);
       break;
+
     case SYS_SEEK:
       syscall_args_check(syscall_num, 2);
       sys_seek(NULL, NULL);
       break;
+
     case SYS_TELL:
       syscall_args_check(syscall_num, 1);
       result = sys_tell(NULL);
       break;
+
     case SYS_CLOSE:
       syscall_args_check(syscall_num, 1);
       sys_close(NULL);
-      break;  
+      break;
+
     default:
       sys_exit(-1); // Terminates the current program, -1 to indicate errors as it is invalid.
   }
@@ -131,18 +144,20 @@ syscall_handler (struct intr_frame *f UNUSED)
 void syscall_args_check(uint32_t *syscall_num, int args) {
   switch (args) {
     case 1:
-      if (!is_user_vaddr(syscall_num + 1)) {
+      if (!(is_user_vaddr(syscall_num + 1))) {
         sys_exit(-1);
       }
     break;
+
     case 2:
-      if (!(is_user_vaddr(syscall_num + 1)) && is_user_vaddr(syscall_num + 2)) {
+      if (!((is_user_vaddr(syscall_num + 1)) && is_user_vaddr(syscall_num + 2))) {
         sys_exit(-1);
       }
       break;
+    
     default:
-      if (!(is_user_vaddr(syscall_num + 1)) && is_user_vaddr(syscall_num + 2) && 
-          is_user_vaddr(syscall_num + 3)) {
+      if (!((is_user_vaddr(syscall_num + 1)) && is_user_vaddr(syscall_num + 2) && 
+          is_user_vaddr(syscall_num + 3))) {
         sys_exit(-1);
       }
   }
