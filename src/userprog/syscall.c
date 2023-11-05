@@ -6,8 +6,9 @@
 
 static void syscall_handler (struct intr_frame *);
 
-/* Max number value for system calls. */
-const int SYSCALL_NUM = 19;
+/* Max and min number value for system calls. */
+const int SYSCALL_MAX = 19;
+const int SYSCALL_MIN = 0;
 
 /* System call functions. */
 static void sys_halt(void);
@@ -38,6 +39,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t *syscall_num = (uint32_t *) f->esp;
   uint32_t syscall_number = *syscall_num;
 
+  /* Result to be stored within eax register if returning a value. */
+  uint32_t result; 
+
   /* Checks to see if pointer is a user virtual address. */
   if (!is_user_vaddr(syscall_num)) {
     sys_exit(-1);
@@ -54,7 +58,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 
   /* Checks if the system call value is within range. */
-  if (syscall_num < 0 || syscall_num > SYSCALL_NUM) {
+  if (syscall_num < SYSCALL_MIN || syscall_num > SYSCALL_MAX) {
     sys_exit(-1);
   }
 
@@ -70,34 +74,34 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_exit(NULL);
       break;
     case SYS_EXEC:
-      sys_exec(NULL);
+      result = sys_exec(NULL);
       break;
     case SYS_WAIT:
-      sys_wait(NULL);
+      result = sys_wait(NULL);
       break;
     case SYS_CREATE:
-      sys_create(NULL, NULL);
+      result = sys_create(NULL, NULL);
       break;
     case SYS_REMOVE:
-      sys_remove(NULL);
+      result = sys_remove(NULL);
       break;
     case SYS_OPEN:
-      sys_open(NULL);
+      result = sys_open(NULL);
       break;
     case SYS_FILESIZE:
-      sys_filesize(NULL);
+      result = sys_filesize(NULL);
       break;
     case SYS_READ:
-      sys_read(NULL, NULL, NULL);
+      result = sys_read(NULL, NULL, NULL);
       break;
     case SYS_WRITE:
-      sys_write(NULL, NULL, NULL);
+      result = sys_write(NULL, NULL, NULL);
       break;
     case SYS_SEEK:
       sys_seek(NULL, NULL);
       break;
     case SYS_TELL:
-      sys_tell(NULL);
+      result = sys_tell(NULL);
       break;
     case SYS_CLOSE:
       sys_close(NULL);
