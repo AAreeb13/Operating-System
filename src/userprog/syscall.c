@@ -32,6 +32,8 @@ syscall_init (void)
   syst();
 }
 
+/* System calls handler that reroutes to correct system calls function depending on the value in
+   the 32 bit word at the caller's stack pointer. */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
@@ -47,7 +49,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   /* Result to be stored within eax register if returning a value. */
   uint32_t result = NULL; 
 
-  /* Checks to see if pointer is a user virtual address. */
+  /* Checks to see if pointer is a valid user virtual address. */
   if (!is_user_vaddr(syscall_number_address)) {
     sys_exit(-1);
   }
@@ -68,7 +70,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
   
   /* Switch statement to handle each system call depending on syscall_number value. */
-  // Values currently NULL as each call has yet to be implemented (delete comment once done).
   switch (syscall_number) {
     case SYS_HALT:
       sys_halt();
@@ -135,7 +136,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
 
     default:
-      sys_exit(-1); // Terminates the current program, -1 to indicate errors as it is invalid.
+      sys_exit(-1);
   }
 
   /* NULL tells us if result has been modified or not, and therefore whether the eax register 
@@ -147,7 +148,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   return;
 }
 
-/* Helper function for syscall_handler() to check arguments are valid user memory addresses. */
+/* Helper function for syscall_handler() to check if the arguments are valid memory addresses. */
 void syscall_args_check(uint32_t *syscall_num, int args) {
   switch (args) {
     case 1:
