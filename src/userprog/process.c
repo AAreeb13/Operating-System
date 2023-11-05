@@ -88,8 +88,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  int i = 0;
   while(true) {
-
+    i = i ? 1 : 0;
   }
   return -1;
 }

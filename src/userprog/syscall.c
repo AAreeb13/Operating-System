@@ -5,6 +5,8 @@
 #include "threads/thread.h"
 
 static void syscall_handler (struct intr_frame *);
+static void access_user_mem (uint32_t *, const void *);
+static void exit(void);
 
 /* Max and min number value for system calls. */
 const int SYSCALL_MAX = 19;
@@ -168,5 +170,13 @@ void syscall_args_check(uint32_t *syscall_num, int args) {
           is_user_vaddr(syscall_num + 3))) {
         sys_exit(-1);
       }
+  }
+}
+
+static void access_user_mem (const void *uaddr) {
+  if (uaddr != NULL && is_user_vaddr (uaddr)) {
+    pagedir_get_page(thread_current()->pagedir, uaddr);
+  } else {
+    exit();
   }
 }
