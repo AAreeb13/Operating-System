@@ -36,35 +36,36 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   /* Creates a pointer to 32 bit system call number from SP and dereferences it. */
-  uint32_t *syscall_num = (uint32_t *) f->esp;
-  uint32_t syscall_number = *syscall_num;
+  uint32_t *syscall_number_address = (uint32_t *) f->esp;
+  uint32_t syscall_number = *syscall_number_address;
 
-  /* */
+  /* Parameter values grabbed for system calls. */
+  uint32_t *parameter_1 = syscall_number_address + 1;
+  uint32_t *parameter_2 = syscall_number_address + 2;
+  uint32_t *parameter_3 = syscall_number_address + 3;
 
   /* Result to be stored within eax register if returning a value. */
   uint32_t result; 
 
   /* Checks to see if pointer is a user virtual address. */
-  if (!is_user_vaddr(syscall_num)) {
+  if (!is_user_vaddr(syscall_number_address)) {
     sys_exit(-1);
   }
 
   /* Checks to see if pointer does not point into kernel memory. */
-  if (is_kernel_vaddr(syscall_num)) {
+  if (is_kernel_vaddr(syscall_number_address)) {
     sys_exit(-1);
   }
 
   /* Verifies the pointer is not NULL. */
-  if (syscall_num == NULL) {
+  if (syscall_number_address == NULL) {
     sys_exit(-1);
   }
 
   /* Checks if the system call value is within range. */
-  if (syscall_num < SYSCALL_MIN || syscall_num > SYSCALL_MAX) {
+  if (syscall_number_address < SYSCALL_MIN || syscall_number_address > SYSCALL_MAX) {
     sys_exit(-1);
   }
-
-  // TODO: Check for first 3 arguments when necessary
   
   /* Switch statement to handle each system call depending on syscall_number value. */
   // Values currently NULL as each call has yet to be implemented (delete comment once done).
@@ -74,70 +75,68 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
 
     case SYS_EXIT:
-      syscall_args_check(syscall_num, 1);
-      sys_exit(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      sys_exit(parameter_1);
       break;
 
     case SYS_EXEC:
-      syscall_args_check(syscall_num, 1);
-      result = sys_exec(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      result = sys_exec(parameter_1);
       break;
 
     case SYS_WAIT:
-      syscall_args_check(syscall_num, 1);
-      result = sys_wait(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      result = sys_wait(parameter_1);
       break;
 
     case SYS_CREATE:
-      syscall_args_check(syscall_num, 2);
-      result = sys_create(NULL, NULL);
+      syscall_args_check(syscall_number_address, 2);
+      result = sys_create(parameter_1, parameter_2);
       break;
 
     case SYS_REMOVE:
-      syscall_args_check(syscall_num, 1);
-      result = sys_remove(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      result = sys_remove(parameter_1);
       break;
 
     case SYS_OPEN:
-      syscall_args_check(syscall_num, 1);
-      result = sys_open(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      result = sys_open(parameter_1);
       break;
 
     case SYS_FILESIZE:
-      syscall_args_check(syscall_num, 1);
-      result = sys_filesize(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      result = sys_filesize(parameter_1);
       break;
 
     case SYS_READ:
-      syscall_args_check(syscall_num, 3);
-      result = sys_read(NULL, NULL, NULL);
+      syscall_args_check(syscall_number_address, 3);
+      result = sys_read(parameter_1, parameter_2, parameter_3);
       break;
 
     case SYS_WRITE:
-      syscall_args_check(syscall_num, 3);
-      result = sys_write(NULL, NULL, NULL);
+      syscall_args_check(syscall_number_address, 3);
+      result = sys_write(parameter_1, parameter_2, parameter_3);
       break;
 
     case SYS_SEEK:
-      syscall_args_check(syscall_num, 2);
-      sys_seek(NULL, NULL);
+      syscall_args_check(syscall_number_address, 2);
+      sys_seek(parameter_1, parameter_2);
       break;
 
     case SYS_TELL:
-      syscall_args_check(syscall_num, 1);
-      result = sys_tell(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      result = sys_tell(parameter_1);
       break;
 
     case SYS_CLOSE:
-      syscall_args_check(syscall_num, 1);
-      sys_close(NULL);
+      syscall_args_check(syscall_number_address, 1);
+      sys_close(parameter_1);
       break;
 
     default:
       sys_exit(-1); // Terminates the current program, -1 to indicate errors as it is invalid.
   }
-
-  // TODO: Store value into f->eax (if call returns value).
 }
 
 /* Helper function for syscall_handler() to check arguments are valid user memory addresses. */
