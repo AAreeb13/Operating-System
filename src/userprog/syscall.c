@@ -45,7 +45,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t *parameter_3 = syscall_number_address + 3;
 
   /* Result to be stored within eax register if returning a value. */
-  uint32_t result; 
+  uint32_t result = NULL; 
 
   /* Checks to see if pointer is a user virtual address. */
   if (!is_user_vaddr(syscall_number_address)) {
@@ -137,6 +137,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     default:
       sys_exit(-1); // Terminates the current program, -1 to indicate errors as it is invalid.
   }
+
+  /* NULL tells us if result has been modified or not, and therefore whether the eax register 
+     needs to be changed. */
+  if (result != NULL) {
+    f->eax = result;
+  }
+
+  return;
 }
 
 /* Helper function for syscall_handler() to check arguments are valid user memory addresses. */
