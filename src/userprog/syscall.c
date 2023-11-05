@@ -6,6 +6,9 @@
 
 static void syscall_handler (struct intr_frame *);
 
+/* Max number value for system calls. */
+const int SYSCALL_NUM = 19;
+
 /* System call functions. */
 static void sys_halt(void);
 static void sys_exit(int status);
@@ -35,6 +38,28 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t *syscall_num = (uint32_t *) f->esp;
   uint32_t syscall_number = *syscall_num;
 
+  /* Checks to see if pointer is a user virtual address. */
+  if (!is_user_vaddr(syscall_num)) {
+    sys_exit(-1);
+  }
+
+  /* Checks to see if pointer does not point into kernel memory. */
+  if (is_kernel_vaddr(syscall_num)) {
+    sys_exit(-1);
+  }
+
+  /* Verifies the pointer is not NULL. */
+  if (syscall_num == NULL) {
+    sys_exit(-1);
+  }
+
+  /* Checks if the system call value is within range. */
+  if (syscall_num < 0 || syscall_num > SYSCALL_NUM) {
+    sys_exit(-1);
+  }
+
+  // TODO: Check for first 3 arguments when necessary
+  
   /* Switch statement to handle each system call depending on syscall_number value. */
   // Values currently NULL as each call has yet to be implemented (delete comment once done).
   switch (syscall_number) {
@@ -78,6 +103,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_close(NULL);
       break;  
     default:
-      thread_exit(); // Terminates thread if unsupported call given.
+      sys_exit(-1); // Terminates the current program, -1 to indicate errors as it is invalid.
   }
+
+  // TODO: Store value into f->eax (if call returns value).
 }
