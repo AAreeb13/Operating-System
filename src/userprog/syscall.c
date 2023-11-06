@@ -180,6 +180,7 @@ static bool access_user_mem (const void *uaddr) {
   sys_exit(-1);
 }
 
-static void sys_exit(int status UNUSED) {
+static void sys_exit(int status) {
+  printf ("%s: exit(%d)\n", thread_current()->name,status);
   thread_exit();
 }
