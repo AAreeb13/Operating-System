@@ -53,21 +53,6 @@ putbuf (const char *buffer, size_t n)
 }
 */
 
-int write(int fd, const void *buffer, unsigned size) {
-  if (fd == 1) {
-    const char *charBuffer = (const char *)buffer;
-
-    // Checking buffer is not NULL, if NULL return 0 since no byte was written
-    if (charBuffer == NULL) {
-      return 0;
-    }
-
-    // Write to console using putbuf
-    putbuf(charBuffer, size);
-    return size;
-  }
-}
-
 void
 syscall_init (void) 
 {
@@ -92,26 +77,13 @@ syscall_handler (struct intr_frame *f UNUSED)
   /* Result to be stored within eax register if returning a value. */
   uint32_t result = NULL; 
 
-  /* Checks to see if pointer is a valid user virtual address. */
-  if (!is_user_vaddr(syscall_number_address)) {
-    sys_exit(-1);
-  }
-
-  /* Checks to see if pointer does not point into kernel memory. */
-  if (is_kernel_vaddr(syscall_number_address)) {
-    sys_exit(-1);
-  }
-
-  /* Verifies the pointer is not NULL. */
-  if (syscall_number_address == NULL) {
-    sys_exit(-1);
-  }
-
   /* Checks if the system call value is within range. */
-  if (syscall_number_address < SYSCALL_MIN || syscall_number_address > SYSCALL_MAX) {
+  if (syscall_number < SYSCALL_MIN || syscall_number > SYSCALL_MAX) {
     sys_exit(-1);
   }
   
+  // TODO: Use tables to hold functions and args over switch statements and passing args.
+
   /* Switch statement to handle each system call depending on syscall_number value. */
   switch (syscall_number) {
     case SYS_HALT:
@@ -193,24 +165,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 /* Helper function for syscall_handler() to check if the arguments are valid memory addresses. */
 void syscall_args_check(uint32_t *syscall_num, int args) {
-  switch (args) {
-    case 1:
-      if (!(is_user_vaddr(syscall_num + 1))) {
-        sys_exit(-1);
-      }
-    break;
-
-    case 2:
-      if (!((is_user_vaddr(syscall_num + 1)) && is_user_vaddr(syscall_num + 2))) {
-        sys_exit(-1);
-      }
-      break;
-    
-    default:
-      if (!((is_user_vaddr(syscall_num + 1)) && is_user_vaddr(syscall_num + 2) && 
-          is_user_vaddr(syscall_num + 3))) {
-        sys_exit(-1);
-      }
+  for (int i = 1; i <= args; i++) {
+    access_user_mem (syscall_num + i);
   }
 }
 
@@ -224,4 +180,19 @@ static bool access_user_mem (const void *uaddr) {
 static void sys_exit(int status) {
   printf ("%s: exit(%d)\n", thread_current()->name,status);
   thread_exit();
+}
+
+static int sys_write(int fd, const void *buffer, unsigned size) {
+  if (fd == 1) {
+    const char *charBuffer = (const char *)buffer;
+
+    // Checking buffer is not NULL, if NULL return 0 since no byte was written
+    if (charBuffer == NULL) {
+      return 0;
+    }
+
+    // Write to console using putbuf
+    putbuf(charBuffer, size);
+    return size;
+  }
 }
