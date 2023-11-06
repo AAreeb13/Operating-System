@@ -5,7 +5,7 @@
 #include "threads/thread.h"
 
 static void syscall_handler (struct intr_frame *);
-static void access_user_mem (uint32_t *, const void *);
+static bool access_user_mem (const void *);
 static void exit(void);
 
 /* Max and min number value for system calls. */
@@ -173,13 +173,13 @@ void syscall_args_check(uint32_t *syscall_num, int args) {
   }
 }
 
-static void access_user_mem (const void *uaddr) {
-  if (uaddr != NULL && is_user_vaddr (uaddr)) {
-    pagedir_get_page(thread_current()->pagedir, uaddr);
-  } else {
-    exit();
+static bool access_user_mem (const void *uaddr) {
+  if (is_user_vaddr(uaddr) && pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
+    return true;
   }
+  sys_exit(-1);
 }
+
 static void sys_exit(int status UNUSED) {
   thread_exit();
 }
