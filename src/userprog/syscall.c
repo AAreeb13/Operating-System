@@ -180,3 +180,6 @@ static void access_user_mem (const void *uaddr) {
     exit();
   }
 }
+static void sys_exit(int status UNUSED) {
+  thread_exit();
+}
