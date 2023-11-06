@@ -193,16 +193,25 @@ static pid_t sys_exec(const char *file);
 
 static int sys_wait(pid_t pid);
 
-static bool sys_create(const char *file, unsigned initial_size);
+/* Creates a new file named by input with a specified size. */
+static bool sys_create(const char *file, unsigned initial_size) {
+  if (file == NULL) {
+    sys_exit(-1);
+  }
 
-/* Removes specified file if possible, returning a value depending on success or failure. */
+  bool result = filesys_create(file, initial_size);
+
+  return result;
+}
+
+/* Deletes specified file if possible, returning a value depending on success or failure. */
 static bool sys_remove(const char *file) {
   if (file == NULL) {
     sys_exit(-1);
   }
 
   bool result = filesys_remove(file);
-  
+
   return result;
 }
 
