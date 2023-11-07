@@ -187,9 +187,10 @@ static void sys_exit(int status) {
   thread_exit();
 }
 
-static void sys_exit(int status);
-
-static pid_t sys_exec(const char *file);
+static pid_t sys_exec(const char *file) {
+  int result = process_execute(file);
+  return result;
+}
 
 static int sys_wait(pid_t pid);
 
@@ -240,6 +241,4 @@ static void sys_seek(int fd, unsigned position);
 
 static unsigned sys_tell(int fd);
 
-static void sys_close(int fd) {
-  
-}
+static void sys_close(int fd);
