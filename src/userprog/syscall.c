@@ -187,6 +187,7 @@ static void sys_exit(int status) {
   thread_exit();
 }
 
+/* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
   int result = process_execute(file);
   return result;
@@ -196,10 +197,6 @@ static int sys_wait(pid_t pid);
 
 /* Creates a new file named by input with a specified size. */
 static bool sys_create(const char *file, unsigned initial_size) {
-  if (file == NULL) {
-    sys_exit(-1);
-  }
-
   bool result = filesys_create(file, initial_size);
 
   return result;
@@ -207,10 +204,6 @@ static bool sys_create(const char *file, unsigned initial_size) {
 
 /* Deletes specified file if possible, returning a value depending on success or failure. */
 static bool sys_remove(const char *file) {
-  if (file == NULL) {
-    sys_exit(-1);
-  }
-
   bool result = filesys_remove(file);
 
   return result;
