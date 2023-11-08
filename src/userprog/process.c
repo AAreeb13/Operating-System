@@ -102,6 +102,7 @@ process_wait (tid_t child_tid)
     if (manager->child_pid == child_tid) {
       sema_down(manager->wait_sema);
       int exit_status = manager->exit_status;
+      list_remove(manager->elem);
       free(manager);
       return exit_status;
     }

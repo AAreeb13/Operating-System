@@ -6,7 +6,6 @@
 
 static void syscall_handler (struct intr_frame *);
 static bool access_user_mem (const void *);
-static void exit(void);
 
 /* Max and min number value for system calls. */
 const int SYSCALL_MAX = 19;
@@ -14,18 +13,21 @@ const int SYSCALL_MIN = 0;
 
 /* System call functions. */
 static void sys_halt(void);
-static void sys_exit(int status);
-static pid_t sys_exec(const char *file);
-static int sys_wait(pid_t pid);
-static bool sys_create(const char *file, unsigned initial_size);
-static bool sys_remove(const char *file);
-static int sys_open(const char *file);
-static int sys_filesize(int fd);
-static int sys_read(int fd, void *buffer, unsigned size);
-static int sys_write(int fd, const void *buffer, unsigned size);
-static void sys_seek(int fd, unsigned position);
-static unsigned sys_tell(int fd);
-static void sys_close(int fd);
+static void sys_exit(int);
+static pid_t sys_exec(const char *);
+static int sys_wait(pid_t);
+static bool sys_create(const char *, unsigned);
+static bool sys_remove(const char *);
+static int sys_open(const char *);
+static int sys_filesize(int);
+static int sys_read(int, void *, unsigned);
+static int sys_write(int, const void *, unsigned);
+static void sys_seek(int, unsigned);
+static unsigned sys_tell(int);
+static void sys_close(int);
+
+static void child_exit(int, struct manager *);
+static void parent_exit(struct list *);
 
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
@@ -182,8 +184,19 @@ static void sys_halt(void) {
   shutdown_power_off();
 }
 
+/* TODO */
 static void sys_exit(int status) {
-  printf ("%s: exit(%d)\n", thread_current()->name,status);
+  struct manager *manager = thread_current()->manager;
+  struct list *managers = &thread_current()->managers;
+
+  if (manager != NULL) {
+    child_exit(status, manager);
+  }
+  if (managers != NULL) {
+    parent_exit(managers);
+  }
+
+  printf("%s: exit(%d)\n", thread_current()->name,status);
   thread_exit();
 }
 
@@ -197,7 +210,9 @@ static pid_t sys_exec(const char *file) {
   return result;
 }
 
-static int sys_wait(pid_t pid);
+static int sys_wait(pid_t pid) {
+  return process_wait(pid);
+};
 
 /* Creates a new file named by input with a specified size. */
 static bool sys_create(const char *file, unsigned initial_size) {
@@ -239,3 +254,33 @@ static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 
 static void sys_close(int fd);
+
+static void child_exit(int status, struct manager *manager) {
+  lock_acquire(manager->rw_lock);
+  manager->exit_status = status;
+  sema_up(manager->wait_sema);
+  if (manager->parent_dead) {
+    free(manager);
+  } else {
+    lock_release(manager->rw_lock);
+  }
+}
+
+static void parent_exit(struct list *managers) {
+  struct list_elem *e = list_begin(managers);
+  struct manager *manager;
+
+  while (e != list_end(managers)) {
+    manager = list_entry(e, struct manager, elem);
+    lock_acquire(manager->rw_lock);
+
+    if (manager->exit_status == NULL) {
+      manager->parent_dead = true;
+      e = list_next(e);
+      lock_release(manager->rw_lock);
+    } else {
+      e = list_next(e);
+      free(manager);
+    }
+  }
+}
