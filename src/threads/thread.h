@@ -104,15 +104,14 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
   };
 
-/* Element of managers. Child processes will write their exit_status. wait_sema is for making parent wait. rw_lock
-   is for reading and writing. */
+
 struct manager {
   pid_t child_pid;
-  int exit_status;
+  int exit_status;                      /* Child processes will write their exit_status. */
   bool parent_dead;
-  struct semaphore *wait_sema;
-  struct lock *rw_lock;
-  struct list_elem elem;
+  struct semaphore *wait_sema;          /* For making parent wait. */
+  struct lock *rw_lock;                 /* For reading and writing. */
+  struct list_elem elem;                /* List element for managers list. */
 };
 
 /* If false (default), use round-robin scheduler.

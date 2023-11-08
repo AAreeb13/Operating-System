@@ -184,7 +184,6 @@ static void sys_halt(void) {
   shutdown_power_off();
 }
 
-/* TODO */
 static void sys_exit(int status) {
   struct manager *manager = thread_current()->manager;
   struct list *managers = &thread_current()->managers;
@@ -255,10 +254,12 @@ static unsigned sys_tell(int fd);
 
 static void sys_close(int fd);
 
+/* Child process writes its exit_status and frees manager if parent is dead. */
 static void child_exit(int status, struct manager *manager) {
   lock_acquire(manager->rw_lock);
   manager->exit_status = status;
   sema_up(manager->wait_sema);
+
   if (manager->parent_dead) {
     free(manager);
   } else {
@@ -266,6 +267,7 @@ static void child_exit(int status, struct manager *manager) {
   }
 }
 
+/* Parent process frees managers of dead children and tells live children that it's dead. */
 static void parent_exit(struct list *managers) {
   struct list_elem *e = list_begin(managers);
   struct manager *manager;
