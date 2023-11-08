@@ -189,6 +189,10 @@ static void sys_exit(int status) {
 
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
+  if (thread_current()->managers == NULL) {
+    list_init(&thread_current->managers);
+  }
+
   int result = process_execute(file);
   return result;
 }
