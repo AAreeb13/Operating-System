@@ -203,7 +203,7 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
   }
   t->manager = manager;
-  manager->child = tid;
+  manager->child_pid = tid;
   manager->parent_dead = false;
   sema_init(manager->wait_sema, 0);
   lock_init(manager->rw_lock);

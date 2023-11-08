@@ -107,7 +107,7 @@ struct thread
 /* Element of managers. Child processes will write their exit_status. wait_sema is for making parent wait. rw_lock
    is for reading and writing. */
 struct manager {
-  pid_t child;
+  pid_t child_pid;
   int exit_status;
   bool parent_dead;
   struct semaphore *wait_sema;
