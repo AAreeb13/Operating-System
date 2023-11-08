@@ -177,10 +177,43 @@ static bool access_user_mem (const void *uaddr) {
   sys_exit(-1);
 }
 
+/* Terminates Pintos. */
+static void sys_halt(void) {
+  shutdown_power_off();
+}
+
 static void sys_exit(int status) {
   printf ("%s: exit(%d)\n", thread_current()->name,status);
   thread_exit();
 }
+
+/* Runs the executable given. */
+static pid_t sys_exec(const char *file) {
+  int result = process_execute(file);
+  return result;
+}
+
+static int sys_wait(pid_t pid);
+
+/* Creates a new file named by input with a specified size. */
+static bool sys_create(const char *file, unsigned initial_size) {
+  bool result = filesys_create(file, initial_size);
+
+  return result;
+}
+
+/* Deletes specified file if possible, returning a value depending on success or failure. */
+static bool sys_remove(const char *file) {
+  bool result = filesys_remove(file);
+
+  return result;
+}
+
+static int sys_open(const char *file);
+
+static int sys_filesize(int fd);
+
+static int sys_read(int fd, void *buffer, unsigned size);
 
 static int sys_write(int fd, const void *buffer, unsigned size) {
   if (fd == 1) {
@@ -196,3 +229,9 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
     return size;
   }
 }
+
+static void sys_seek(int fd, unsigned position);
+
+static unsigned sys_tell(int fd);
+
+static void sys_close(int fd);
