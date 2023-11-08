@@ -96,11 +96,24 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct list managers;
+    struct manager *manager;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+/* Element of managers. Child processes will write their exit_status. wait_sema is for making parent wait. rw_lock
+   is for reading and writing. */
+struct manager {
+  pid_t child;
+  int exit_status;
+  bool parent_dead;
+  struct semaphore *wait_sema;
+  struct lock *rw_lock;
+  struct list_elem elem;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
