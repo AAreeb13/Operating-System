@@ -332,7 +332,7 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 void sys_seek (int fd, unsigned position) {
   struct file *file = fd_to_file(fd);
 
-  // If the fd value is not valid, it exits.
+  // If the fd value is not valid or the file is NULL, it exits.
   if (file != NULL && fd > STDOUT_FILENUM) {
     file_seek(file, position);
   } else {
@@ -340,8 +340,21 @@ void sys_seek (int fd, unsigned position) {
   }
 }
 
+/* Returns the poisiton of the next byte to be written for fd. */
+static unsigned sys_tell(int fd) {
+  struct thread *current_thread = thread_current();
+  struct file *file = fd_to_file(fd);
 
-static unsigned sys_tell(int fd);
+  // If the fd value is not valid or the file is NULL, it exits.
+  if (file != NULL && fd > STDOUT_FILENUM) {
+    return file_tell(file);
+  } else {
+    sys_exit(-1);
+  }
+
+  // Should not reach this line, for compiler warning supression.
+  return -1;
+}
 
 static void sys_close(int fd);
 
