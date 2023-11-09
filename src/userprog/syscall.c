@@ -3,14 +3,20 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "filesys/filesys.h"
+#include "threads/malloc.h"
+#include "devices/input.h"
+#include "devices/shutdown.h"
+#include "userprog/process.h"
+#include "userprog/pagedir.h"
 
 static void syscall_handler (struct intr_frame *);
 static bool access_user_mem (const void *);
-static void exit(void);
 
 /* Standard input and output fd values respectively. */
-const int STDIN_FILENO = 0;
-const int STDOUT_FILENO = 1;
+const int STDIN_FILENUM = 0;
+const int STDOUT_FILENUM = 1;
 
 /* Max and min number value for system calls. */
 const int SYSCALL_MAX = 19;
@@ -61,7 +67,6 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  syst();
 }
 
 /* System calls handler that reroutes to correct system calls function depending on the value in
@@ -78,13 +83,16 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t *parameter_2 = syscall_number_address + 2;
   uint32_t *parameter_3 = syscall_number_address + 3;
 
-  /* Result to be stored within eax register if returning a value. */
-  uint32_t result = NULL; 
+  /* Result to be stored within eax register if returning a value if sucess is true; */
+  uint32_t result = 0;
+  bool success;
 
   /* Checks if the system call value is within range. */
   if (syscall_number < SYSCALL_MIN || syscall_number > SYSCALL_MAX) {
     sys_exit(-1);
   }
+
+  access_user_mem(syscall_number_address);
   
   // TODO: Use tables to hold functions and args over switch statements and passing args.
 
@@ -96,62 +104,71 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_EXIT:
       syscall_args_check(syscall_number_address, 1);
-      sys_exit(parameter_1);
+      sys_exit(*parameter_1);
       break;
 
     case SYS_EXEC:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_exec(parameter_1);
+      result = sys_exec((void *) parameter_1);
+      success = true;
       break;
 
     case SYS_WAIT:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_wait(parameter_1);
+      result = sys_wait(*parameter_1);
+      success = true;
       break;
 
     case SYS_CREATE:
       syscall_args_check(syscall_number_address, 2);
-      result = sys_create(parameter_1, parameter_2);
+      result = sys_create((void *) parameter_1, *parameter_2);
+      success = true;
       break;
 
     case SYS_REMOVE:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_remove(parameter_1);
+      result = sys_remove((void *) parameter_1);
+      success = true;
       break;
 
     case SYS_OPEN:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_open(parameter_1);
+      result = sys_open((void *) parameter_1);
+      success = true;
       break;
 
     case SYS_FILESIZE:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_filesize(parameter_1);
+      result = sys_filesize(*parameter_1);
+      success = true;
       break;
 
     case SYS_READ:
       syscall_args_check(syscall_number_address, 3);
-      result = sys_read(parameter_1, parameter_2, parameter_3);
+      result = sys_read(*parameter_1, (void *) parameter_2, *parameter_3);
+      success = true;
       break;
 
     case SYS_WRITE:
       syscall_args_check(syscall_number_address, 3);
-      result = sys_write(parameter_1, parameter_2, parameter_3);
+      result = sys_write(*parameter_1, (void *) parameter_2, *parameter_3);
+      success = true;
       break;
 
     case SYS_SEEK:
       syscall_args_check(syscall_number_address, 2);
-      sys_seek(parameter_1, parameter_2);
+      sys_seek(*parameter_1, *parameter_2);
       break;
 
     case SYS_TELL:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_tell(parameter_1);
+      result = sys_tell(*parameter_1);
+      success = true;
       break;
 
     case SYS_CLOSE:
       syscall_args_check(syscall_number_address, 1);
-      sys_close(parameter_1);
+      sys_close(*parameter_1);
       break;
 
     default:
@@ -160,11 +177,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   /* NULL tells us if result has been modified or not, and therefore whether the eax register 
      needs to be changed. */
-  if (result != NULL) {
+  if (success) {
     f->eax = result;
+  } else {
+    return;
   }
-
-  return;
 }
 
 /* Helper function for syscall_handler() to check if the arguments are valid memory addresses. */
@@ -231,15 +248,15 @@ static int sys_open(const char *file) {
     return -1;
   }
 
-  fd_elem->file = file;
-  fd_elem->fd = allocate_fd(thread_current());
+  fd_elem->file = f;
+  fd_elem->fd = allocate_fd();
   list_push_back(&thread_current()->file_descriptors, &fd_elem->elem);
   return fd_elem->fd;
 }
 
 /* Returns filesize for a specified file descriptor. */
-int filesize(int fd) {
-  struct file *file = fd_to_file(fd, thread_current());
+int sys_filesize(int fd) {
+  struct file *file = fd_to_file(fd);
 
   if (file != NULL) {
     return file_length(file);
@@ -252,7 +269,7 @@ int filesize(int fd) {
 static int sys_read(int fd, void *buffer, unsigned size) {
 
   // Handles reading from keyboard if fd value is 0 or greater than 1.
-  if (fd == STDIN_FILENO) {
+  if (fd == STDIN_FILENUM) {
     uint8_t *buf = (uint8_t *) buffer;
 
     for (unsigned i = 0; i < size; i++) {
@@ -260,8 +277,8 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     }
 
     return size;
-  } else if (fd > STDOUT_FILENO) {
-    struct file *file = fd_to_file(fd, thread_current());
+  } else if (fd > STDOUT_FILENUM) {
+    struct file *file = fd_to_file(fd);
 
     if (file != NULL) {
       int bytes_read = file_read(file, buffer, size);
@@ -279,7 +296,7 @@ static int sys_read(int fd, void *buffer, unsigned size) {
 static int sys_write(int fd, const void *buffer, unsigned size) {
 
   // Handles standard output fd value to write to console or anything greater.
-  if (fd == STDOUT_FILENO) {
+  if (fd == STDOUT_FILENUM) {
     const char *charBuffer = (const char *) buffer;
 
     // Checking buffer is not NULL, if NULL return 0 since no byte was written.
@@ -291,7 +308,7 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
     putbuf(charBuffer, size);
 
     return size;
-  } else if (fd > STDOUT_FILENO) {
+  } else if (fd > STDOUT_FILENUM) {
     struct thread *current_thread = thread_current();
     struct list_elem *e;
   
@@ -313,11 +330,10 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 
 /* Changes the next byte to be read in a file to "position". */
 void sys_seek (int fd, unsigned position) {
-  struct thread *current_thread = thread_current();
-  struct file *file = fd_to_file(fd, current_thread);
+  struct file *file = fd_to_file(fd);
 
   // If the fd value is not valid, it exits.
-  if (file != NULL && fd > STDOUT_FILENO) {
+  if (file != NULL && fd > STDOUT_FILENUM) {
     file_seek(file, position);
   } else {
     sys_exit(-1);
@@ -330,7 +346,8 @@ static unsigned sys_tell(int fd);
 static void sys_close(int fd);
 
 /* Finds an available fd value by iterating through file_descriptors of thread. */
-int allocate_fd(struct thread *thread) {
+int allocate_fd(void) {
+  struct thread *thread = thread_current();
   int fd = 2; // Starts from 2 to avoid conflicts with standard input/output values.
   struct list_elem *e;
 
@@ -350,8 +367,9 @@ int allocate_fd(struct thread *thread) {
 }
 
 /* Grabs the file associated with an fd value from some thread. */
-struct file *fd_to_file(int fd, struct thread *thread) {
+struct file *fd_to_file(int fd) {
   struct list_elem *e;
+  struct thread *thread = thread_current();
 
   for (e = list_begin(&thread->file_descriptors); 
        e != list_end(&thread->file_descriptors); 
