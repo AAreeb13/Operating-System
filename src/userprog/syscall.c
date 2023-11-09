@@ -8,6 +8,10 @@ static void syscall_handler (struct intr_frame *);
 static bool access_user_mem (const void *);
 static void exit(void);
 
+/* Standard input and output fd values respectively. */
+const int STDIN_FILENO = 0;
+const int STDOUT_FILENO = 1;
+
 /* Max and min number value for system calls. */
 const int SYSCALL_MAX = 19;
 const int SYSCALL_MIN = 0;
@@ -190,6 +194,7 @@ static void sys_exit(int status) {
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
   int result = process_execute(file);
+  
   return result;
 }
 
@@ -243,8 +248,33 @@ int filesize(int fd) {
   }
 }
 
+/* Reads "size" bytes from file open as fd into buffer. */
+static int sys_read(int fd, void *buffer, unsigned size) {
 
-static int sys_read(int fd, void *buffer, unsigned size);
+  // Exits if fd value is 1.
+  if (fd == STDOUT_FILENO) {
+    return -1;
+  }
+
+  // Handles reading from keyboard if fd value is 0.
+  if (fd == STDIN_FILENO) {
+    uint8_t *buf = (uint8_t *) buffer;
+    for (unsigned i = 0; i < size; i++) {
+      buf[i] = input_getc();
+    }
+    return size;
+  }
+    
+  struct file *file = fd_to_file(fd, thread_current());
+
+  // Handles reading from file if fd value is otherwise.
+  if (file != NULL) {
+    int bytes_read = file_read(file, buffer, size);
+    return bytes_read;
+  } else {
+    return -1;
+  }
+}
 
 static int sys_write(int fd, const void *buffer, unsigned size) {
   if (fd == 1) {
