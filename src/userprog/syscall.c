@@ -209,7 +209,28 @@ static bool sys_remove(const char *file) {
   return result;
 }
 
-static int sys_open(const char *file);
+/* Opens the file specified. */
+static int sys_open(const char *file) {
+  struct file *f = filesys_open(file);
+
+  // Returns -1 if file does not exist.
+  if (f == NULL) {
+    return -1;
+  }
+
+  struct file_descriptor *fd_elem = malloc(sizeof(struct file_descriptor));
+
+  // Returns -1 if memory could not be allocated for this file (descriptor).
+  if (fd_elem == NULL) {
+    file_close(f);
+    return -1;
+  }
+
+  fd_elem->file = file;
+  fd_elem->fd = allocate_fd(thread_current());
+  list_push_back(&thread_current()->file_descriptors, &fd_elem->elem);
+  return fd_elem->fd;
+}
 
 static int sys_filesize(int fd);
 
