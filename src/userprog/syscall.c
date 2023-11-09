@@ -356,7 +356,28 @@ static unsigned sys_tell(int fd) {
   return -1;
 }
 
-static void sys_close(int fd);
+/* Closes file descriptor fd. */
+static void sys_close(int fd) {
+  struct thread *current_thread = thread_current();
+  struct file *file = fd_to_file(fd);
+
+  if (file != NULL && fd > STDOUT_FILENUM) {
+    file_close(file);
+    struct list_elem *e;
+
+    for (e = list_begin(&current_thread->file_descriptors); 
+         e != list_end(&current_thread->file_descriptors); 
+         e = list_next(e)) {
+      struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+
+      if (fd_elem->fd == fd) {
+        list_remove(e);
+        free(fd_elem);
+        return;
+      }
+    }
+  }
+}
 
 /* Finds an available fd value by iterating through file_descriptors of thread. */
 int allocate_fd(void) {
