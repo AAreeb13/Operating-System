@@ -37,6 +37,9 @@ static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
 static void sys_close(int);
 
+static void child_exit(int, struct manager *);
+static void parent_exit(struct list *);
+
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
 Writing past end-of-file would normally extend the file, but file growth is not implemented
@@ -204,18 +207,34 @@ static void sys_halt(void) {
 }
 
 static void sys_exit(int status) {
-  printf ("%s: exit(%d)\n", thread_current()->name,status);
+  struct manager *manager = thread_current()->manager;
+  struct list *managers = &thread_current()->managers;
+
+  if (manager != NULL) {
+    child_exit(status, manager);
+  }
+  if (managers != NULL) {
+    parent_exit(managers);
+  }
+
+  printf("%s: exit(%d)\n", thread_current()->name,status);
   thread_exit();
 }
 
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
+  /* TODO: check return value of load. */
+  if (thread_current()->managers == NULL) {
+    list_init(&thread_current->managers);
+  }
   int result = process_execute(file);
 
   return result;
 }
 
-static int sys_wait(pid_t pid);
+static int sys_wait(pid_t pid) {
+  return process_wait(pid);
+};
 
 /* Creates a new file named by input with a specified size. */
 static bool sys_create(const char *file, unsigned initial_size) {
@@ -415,4 +434,37 @@ struct file *fd_to_file(int fd) {
   }
 
   return NULL; // If the file descriptor is not found, return NULL.
+}
+
+/* Child process writes its exit_status and frees manager if parent is dead. */
+static void child_exit(int status, struct manager *manager) {
+  lock_acquire(manager->rw_lock);
+  manager->exit_status = status;
+  sema_up(manager->wait_sema);
+
+  if (manager->parent_dead) {
+    free(manager);
+  } else {
+    lock_release(manager->rw_lock);
+  }
+}
+
+/* Parent process frees managers of dead children and tells live children that it's dead. */
+static void parent_exit(struct list *managers) {
+  struct list_elem *e = list_begin(managers);
+  struct manager *manager;
+
+  while (e != list_end(managers)) {
+    manager = list_entry(e, struct manager, elem);
+    lock_acquire(manager->rw_lock);
+
+    if (manager->exit_status == NULL) {
+      manager->parent_dead = true;
+      e = list_next(e);
+      lock_release(manager->rw_lock);
+    } else {
+      e = list_next(e);
+      free(manager);
+    }
+  }
 }

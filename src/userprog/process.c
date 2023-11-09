@@ -86,13 +86,28 @@ start_process (void *file_name_)
  * This function will be implemented in task 2.
  * For now, it does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
-  int i = 0;
-  while(true) {
-    i = i ? 1 : 0;
+  if (child_tid == NULL || child_tid < 1) {
+    return TID_ERROR;
   }
-  return -1;
+
+  /* Traverse managers and wait on child process if valid. */
+  struct list_elem *e;
+  struct manager *manager;
+  struct list *managers = &thread_current()->managers;
+
+  for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
+    manager = list_entry(e, struct manager, elem);
+    if (manager->child_pid == child_tid) {
+      sema_down(manager->wait_sema);
+      int exit_status = manager->exit_status;
+      list_remove(manager->elem);
+      free(manager);
+      return exit_status;
+    }
+  }
+  return TID_ERROR;
 }
 
 /* Free the current process's resources. */

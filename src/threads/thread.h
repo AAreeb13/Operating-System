@@ -97,6 +97,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct list file_descriptors;       /* List of file descriptors. */
+    struct list managers;
+    struct manager *manager;
 #endif
 
     /* Owned by thread.c. */
@@ -110,6 +112,14 @@ struct file_descriptor {
   struct list_elem elem;
 };
 
+struct manager {
+  pid_t child_pid;
+  int exit_status;                      /* Child processes will write their exit_status. */
+  bool parent_dead;
+  struct semaphore *wait_sema;          /* For making parent wait. */
+  struct lock *rw_lock;                 /* For reading and writing. */
+  struct list_elem elem;                /* List element for managers list. */
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

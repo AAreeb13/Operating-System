@@ -191,10 +191,24 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
   old_level = intr_disable ();
+
+#ifdef USERPROG
+  struct manager *manager = malloc(sizeof(struct manager));
+  if (manager == NULL) {
+    return TID_ERROR;
+  }
+  t->manager = manager;
+  manager->child_pid = tid;
+  manager->parent_dead = false;
+  sema_init(manager->wait_sema, 0);
+  lock_init(manager->rw_lock);
+  list_push_back(&thread_current()->managers, &manager->elem);
+#endif
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
