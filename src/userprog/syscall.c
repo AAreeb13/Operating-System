@@ -251,34 +251,34 @@ int filesize(int fd) {
 /* Reads "size" bytes from file open as fd into buffer. */
 static int sys_read(int fd, void *buffer, unsigned size) {
 
-  // Exits if fd value is 1.
-  if (fd == STDOUT_FILENO) {
-    return -1;
-  }
-
-  // Handles reading from keyboard if fd value is 0.
+  // Handles reading from keyboard if fd value is 0 or greater than 1.
   if (fd == STDIN_FILENO) {
     uint8_t *buf = (uint8_t *) buffer;
+
     for (unsigned i = 0; i < size; i++) {
       buf[i] = input_getc();
     }
-    return size;
-  }
-    
-  struct file *file = fd_to_file(fd, thread_current());
 
-  // Handles reading from file if fd value is otherwise.
-  if (file != NULL) {
-    int bytes_read = file_read(file, buffer, size);
-    return bytes_read;
-  } else {
-    return -1;
+    return size;
+  } else if (fd > STDOUT_FILENO) {
+    struct file *file = fd_to_file(fd, thread_current());
+
+    if (file != NULL) {
+      int bytes_read = file_read(file, buffer, size);
+      return bytes_read;
+    } else {
+      return -1;
+    }
   }
+  
+  // Handles invalid fd values.
+  return -1;
 }
 
 /* Writes to file or console depending on fd value. */
 static int sys_write(int fd, const void *buffer, unsigned size) {
-  // Handles standard output fd value to write to console.
+
+  // Handles standard output fd value to write to console or anything greater.
   if (fd == STDOUT_FILENO) {
     const char *charBuffer = (const char *) buffer;
 
@@ -289,6 +289,7 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 
     // Write to console using putbuf.
     putbuf(charBuffer, size);
+    
     return size;
   } else if (fd > STDOUT_FILENO) {
     struct thread *current_thread = thread_current();
