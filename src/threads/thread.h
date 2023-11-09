@@ -96,11 +96,20 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct list file_descriptors;       /* List of file descriptors. */
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+/* Struct to hold file descriptor information and for storing into the list. */
+struct file_descriptor {
+  int fd;
+  struct file *file;
+  struct list_elem elem;
+};
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

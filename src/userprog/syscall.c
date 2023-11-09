@@ -14,18 +14,18 @@ const int SYSCALL_MIN = 0;
 
 /* System call functions. */
 static void sys_halt(void);
-static void sys_exit(int status);
-static pid_t sys_exec(const char *file);
-static int sys_wait(pid_t pid);
-static bool sys_create(const char *file, unsigned initial_size);
-static bool sys_remove(const char *file);
-static int sys_open(const char *file);
-static int sys_filesize(int fd);
-static int sys_read(int fd, void *buffer, unsigned size);
-static int sys_write(int fd, const void *buffer, unsigned size);
-static void sys_seek(int fd, unsigned position);
-static unsigned sys_tell(int fd);
-static void sys_close(int fd);
+static void sys_exit(int);
+static pid_t sys_exec(const char *);
+static int sys_wait(pid_t);
+static bool sys_create(const char *, unsigned);
+static bool sys_remove(const char *);
+static int sys_open(const char *);
+static int sys_filesize(int);
+static int sys_read(int, void *, unsigned);
+static int sys_write(int, const void *, unsigned);
+static void sys_seek(int, unsigned);
+static unsigned sys_tell(int);
+static void sys_close(int);
 
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
@@ -235,3 +235,40 @@ static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 
 static void sys_close(int fd);
+
+/* Finds an available fd value by iterating through file_descriptors of thread. */
+int allocate_fd(struct thread *thread) {
+  int fd = 2; // Starts from 2 to avoid conflicts with standard input/output values.
+  struct list_elem *e;
+
+  for (e = list_begin(&thread->file_descriptors); 
+       e != list_end(&thread->file_descriptors); 
+       e = list_next(e)) {
+    struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+    
+    if (fd_elem->fd == fd) {
+      // If the fd value is here, it will restart the loop with a higher fd value.
+      fd++;
+      e = list_begin(&thread->file_descriptors);
+    }
+  }
+
+  return fd;
+}
+
+/* Grabs the file associated with an fd value from some thread. */
+struct file *fd_to_file(int fd, struct thread *thread) {
+  struct list_elem *e;
+
+  for (e = list_begin(&thread->file_descriptors); 
+       e != list_end(&thread->file_descriptors); 
+       e = list_next(e)) {
+    struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+
+    if (fd_elem->fd == fd) {
+        return fd_elem->file;
+    }
+  }
+
+  return NULL; // If the file descriptor is not found, return NULL.
+}

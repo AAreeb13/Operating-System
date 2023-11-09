@@ -10,4 +10,8 @@ typedef int pid_t;
 
 void syscall_init (void);
 
+/* File descriptor helper functions. */
+int allocate_fd(struct thread *);
+struct file *fd_to_file(int, struct thread *);
+
 #endif /* userprog/syscall.h */
