@@ -79,9 +79,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t syscall_number = *syscall_number_address;
 
   /* Parameter values grabbed for system calls. */
-  uint32_t *parameter_1 = syscall_number_address + 1;
-  uint32_t *parameter_2 = syscall_number_address + 2;
-  uint32_t *parameter_3 = syscall_number_address + 3;
+  uint32_t *arg1 = syscall_number_address + 1;
+  uint32_t *arg2 = syscall_number_address + 2;
+  uint32_t *arg3 = syscall_number_address + 3;
 
   /* Result to be stored within eax register if returning a value if sucess is true; */
   uint32_t result = 0;
@@ -104,71 +104,71 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_EXIT:
       syscall_args_check(syscall_number_address, 1);
-      sys_exit(*parameter_1);
+      sys_exit(*arg1);
       break;
 
     case SYS_EXEC:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_exec((void *) parameter_1);
+      result = sys_exec((void *) arg1);
       success = true;
       break;
 
     case SYS_WAIT:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_wait(*parameter_1);
+      result = sys_wait(*arg1);
       success = true;
       break;
 
     case SYS_CREATE:
       syscall_args_check(syscall_number_address, 2);
-      result = sys_create((void *) parameter_1, *parameter_2);
+      result = sys_create((void *) arg1, *arg2);
       success = true;
       break;
 
     case SYS_REMOVE:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_remove((void *) parameter_1);
+      result = sys_remove((void *) arg1);
       success = true;
       break;
 
     case SYS_OPEN:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_open((void *) parameter_1);
+      result = sys_open((void *) arg1);
       success = true;
       break;
 
     case SYS_FILESIZE:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_filesize(*parameter_1);
+      result = sys_filesize(*arg1);
       success = true;
       break;
 
     case SYS_READ:
       syscall_args_check(syscall_number_address, 3);
-      result = sys_read(*parameter_1, (void *) parameter_2, *parameter_3);
+      result = sys_read(*arg1, (void *) arg2, *arg3);
       success = true;
       break;
 
     case SYS_WRITE:
       syscall_args_check(syscall_number_address, 3);
-      result = sys_write(*parameter_1, (void *) parameter_2, *parameter_3);
+      result = sys_write(*arg1, (void *) arg2, *arg3);
       success = true;
       break;
 
     case SYS_SEEK:
       syscall_args_check(syscall_number_address, 2);
-      sys_seek(*parameter_1, *parameter_2);
+      sys_seek(*arg1, *arg2);
       break;
 
     case SYS_TELL:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_tell(*parameter_1);
+      result = sys_tell(*arg1);
       success = true;
       break;
 
     case SYS_CLOSE:
       syscall_args_check(syscall_number_address, 1);
-      sys_close(*parameter_1);
+      sys_close(*arg1);
       break;
 
     default:
@@ -342,7 +342,6 @@ void sys_seek (int fd, unsigned position) {
 
 /* Returns the poisiton of the next byte to be written for fd. */
 static unsigned sys_tell(int fd) {
-  struct thread *current_thread = thread_current();
   struct file *file = fd_to_file(fd);
 
   // If the fd value is not valid or the file is NULL, it exits.
