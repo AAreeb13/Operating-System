@@ -194,7 +194,7 @@ static void sys_exit(int status) {
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
   int result = process_execute(file);
-  
+
   return result;
 }
 
@@ -276,19 +276,38 @@ static int sys_read(int fd, void *buffer, unsigned size) {
   }
 }
 
+/* Writes to file or console depending on fd value. */
 static int sys_write(int fd, const void *buffer, unsigned size) {
-  if (fd == 1) {
-    const char *charBuffer = (const char *)buffer;
+  // Handles standard output fd value to write to console.
+  if (fd == STDOUT_FILENO) {
+    const char *charBuffer = (const char *) buffer;
 
-    // Checking buffer is not NULL, if NULL return 0 since no byte was written
+    // Checking buffer is not NULL, if NULL return 0 since no byte was written.
     if (charBuffer == NULL) {
       return 0;
     }
 
-    // Write to console using putbuf
+    // Write to console using putbuf.
     putbuf(charBuffer, size);
     return size;
+  } else if (fd > STDOUT_FILENO) {
+    struct thread *current_thread = thread_current();
+    struct list_elem *e;
+  
+    for (e = list_begin(&current_thread->file_descriptors); 
+         e != list_end(&current_thread->file_descriptors); 
+         e = list_next(e)) {
+      struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+  
+      if (fd_elem->fd == fd) {
+        int bytes_written = file_write(fd_elem->file, buffer, size);
+        return bytes_written;
+      }
+    }
   }
+
+  // Handles invalid fd values.
+  return -1;
 }
 
 static void sys_seek(int fd, unsigned position);
