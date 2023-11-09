@@ -232,7 +232,17 @@ static int sys_open(const char *file) {
   return fd_elem->fd;
 }
 
-static int sys_filesize(int fd);
+/* Returns filesize for a specified file descriptor. */
+int filesize(int fd) {
+  struct file *file = fd_to_file(fd, thread_current());
+
+  if (file != NULL) {
+    return file_length(file);
+  } else {
+    return -1;
+  }
+}
+
 
 static int sys_read(int fd, void *buffer, unsigned size);
 
@@ -287,7 +297,7 @@ struct file *fd_to_file(int fd, struct thread *thread) {
     struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
 
     if (fd_elem->fd == fd) {
-        return fd_elem->file;
+      return fd_elem->file;
     }
   }
 
