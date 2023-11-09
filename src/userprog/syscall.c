@@ -289,7 +289,7 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 
     // Write to console using putbuf.
     putbuf(charBuffer, size);
-    
+
     return size;
   } else if (fd > STDOUT_FILENO) {
     struct thread *current_thread = thread_current();
@@ -311,7 +311,19 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
   return -1;
 }
 
-static void sys_seek(int fd, unsigned position);
+/* Changes the next byte to be read in a file to "position". */
+void sys_seek (int fd, unsigned position) {
+  struct thread *current_thread = thread_current();
+  struct file *file = fd_to_file(fd, current_thread);
+
+  // If the fd value is not valid, it exits.
+  if (file != NULL && fd > STDOUT_FILENO) {
+    file_seek(file, position);
+  } else {
+    sys_exit(-1);
+  }
+}
+
 
 static unsigned sys_tell(int fd);
 
