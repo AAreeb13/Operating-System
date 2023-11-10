@@ -206,9 +206,10 @@ static void sys_halt(void) {
 static void sys_exit(int status) {
   struct manager *manager = thread_current()->manager;
   /* rw_lock released in child_exit() called in process_exit() */
-  lock_acquire(manager->rw_lock);
-  manager->exit_status = status;
-  sema_up(manager->wait_sema);
+  //lock_acquire(manager->rw_lock);
+  thread_current()->exit_status = status;
+  //sema_up(manager->wait_sema);
+  //lock_release(manager->rw_lock);
   printf("%s: exit(%d)\n", thread_current()->name,status);
   thread_exit();
 }

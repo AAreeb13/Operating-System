@@ -25,6 +25,11 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#ifdef USERPROG
+#define THREAD_ALIVE -2                 /* Default value at execution */
+#define KERNEL_THREAD_EXIT -1           /* For when a thread dies via thread_exit() instead of sys_exit() */
+#endif USERPROG
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -100,6 +105,7 @@ struct thread
     struct list file_descriptors;       /* List of file descriptors. */
     struct list *managers;
     struct manager *manager;
+    int exit_status;
 #endif
 
     /* Owned by thread.c. */
@@ -121,6 +127,7 @@ struct manager {
   struct lock *rw_lock;                 /* For reading and writing. */
   struct list_elem elem;                /* List element for managers list. */
 };
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

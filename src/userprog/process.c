@@ -514,9 +514,16 @@ install_page (void *upage, void *kpage, bool writable)
 
 /* Child process writes its exit_status and frees manager if parent is dead. */
 static void child_exit(struct manager *manager) {
+  lock_acquire(manager->rw_lock);
+
   if (manager->parent_dead) {
     free(manager);
   } else {
+    if (thread_current()->exit_status == THREAD_ALIVE) {
+      manager->exit_status = KERNERL_THREAD_EXIT;
+    } else {
+      manager->exit_status = thread_current()->exit_status;
+    }
     lock_release(manager->rw_lock);
   }
 }
@@ -530,7 +537,7 @@ static void parent_exit(struct list *managers) {
     manager = list_entry(e, struct manager, elem);
     lock_acquire(manager->rw_lock);
 
-    if (manager->exit_status < -1) {
+    if (manager->exit_status == THREAD_ALIVE) {
       manager->parent_dead = true;
       e = list_next(e);
       lock_release(manager->rw_lock);
