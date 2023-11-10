@@ -23,7 +23,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
-static void child_exit(int, struct manager *);
+static void child_exit(struct manager *);
 static void parent_exit(struct list *);
 
 /* Starts a new thread running a user program loaded from
@@ -125,7 +125,7 @@ process_exit (void)
   struct list *managers = cur->managers;
 
   if (manager != NULL) {
-    child_exit(status, manager);
+    child_exit(manager);
   }
   if (managers != NULL) {
     parent_exit(managers);
@@ -513,11 +513,7 @@ install_page (void *upage, void *kpage, bool writable)
 }
 
 /* Child process writes its exit_status and frees manager if parent is dead. */
-static void child_exit(int status, struct manager *manager) {
-  lock_acquire(manager->rw_lock);
-  manager->exit_status = status;
-  sema_up(manager->wait_sema);
-
+static void child_exit(struct manager *manager) {
   if (manager->parent_dead) {
     free(manager);
   } else {
