@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "threads/malloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -198,16 +199,17 @@ thread_create (const char *name, int priority,
   old_level = intr_disable ();
 
 #ifdef USERPROG
-  struct manager *manager = malloc(sizeof(struct manager));
+  struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
   if (manager == NULL) {
     return TID_ERROR;
   }
   t->manager = manager;
   manager->child_pid = tid;
   manager->parent_dead = false;
+  manager->exit_status = -2;
   sema_init(manager->wait_sema, 0);
   lock_init(manager->rw_lock);
-  list_push_back(&thread_current()->managers, &manager->elem);
+  list_push_back(thread_current()->managers, &manager->elem);
 #endif
 
   /* Stack frame for kernel_thread(). */

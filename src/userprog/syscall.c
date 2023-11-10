@@ -10,9 +10,10 @@
 #include "devices/shutdown.h"
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
+#include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
-static bool access_user_mem (const void *);
+static void access_user_mem (const void *);
 
 /* Standard input and output fd values respectively. */
 const int STDIN_FILENUM = 0;
@@ -194,11 +195,10 @@ void syscall_args_check(uint32_t *syscall_num, int args) {
   }
 }
 
-static bool access_user_mem (const void *uaddr) {
-  if (is_user_vaddr(uaddr) && pagedir_get_page(thread_current()->pagedir, uaddr) != NULL) {
-    return true;
+static void access_user_mem (const void *uaddr) {
+  if (!is_user_vaddr(uaddr) || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
+    sys_exit(-1);
   }
-  sys_exit(-1);
 }
 
 /* Terminates Pintos. */
@@ -208,7 +208,7 @@ static void sys_halt(void) {
 
 static void sys_exit(int status) {
   struct manager *manager = thread_current()->manager;
-  struct list *managers = &thread_current()->managers;
+  struct list *managers = thread_current()->managers;
 
   if (manager != NULL) {
     child_exit(status, manager);
@@ -225,7 +225,7 @@ static void sys_exit(int status) {
 static pid_t sys_exec(const char *file) {
   /* TODO: check return value of load. */
   if (thread_current()->managers == NULL) {
-    list_init(&thread_current->managers);
+    list_init(thread_current()->managers);
   }
   int result = process_execute(file);
 
@@ -458,7 +458,7 @@ static void parent_exit(struct list *managers) {
     manager = list_entry(e, struct manager, elem);
     lock_acquire(manager->rw_lock);
 
-    if (manager->exit_status == NULL) {
+    if (manager->exit_status < -1) {
       manager->parent_dead = true;
       e = list_next(e);
       lock_release(manager->rw_lock);

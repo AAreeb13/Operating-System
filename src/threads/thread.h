@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -97,7 +98,7 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct list file_descriptors;       /* List of file descriptors. */
-    struct list managers;
+    struct list *managers;
     struct manager *manager;
 #endif
 
@@ -113,7 +114,7 @@ struct file_descriptor {
 };
 
 struct manager {
-  pid_t child_pid;
+  tid_t child_pid;
   int exit_status;                      /* Child processes will write their exit_status. */
   bool parent_dead;
   struct semaphore *wait_sema;          /* For making parent wait. */

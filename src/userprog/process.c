@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -88,21 +90,21 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  if (child_tid == NULL || child_tid < 1) {
+  if (child_tid < 1) {
     return TID_ERROR;
   }
 
   /* Traverse managers and wait on child process if valid. */
   struct list_elem *e;
   struct manager *manager;
-  struct list *managers = &thread_current()->managers;
+  struct list *managers = thread_current()->managers;
 
   for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
       sema_down(manager->wait_sema);
       int exit_status = manager->exit_status;
-      list_remove(manager->elem);
+      list_remove(&manager->elem);
       free(manager);
       return exit_status;
     }
