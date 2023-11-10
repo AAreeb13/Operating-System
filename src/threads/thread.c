@@ -203,6 +203,7 @@ thread_create (const char *name, int priority,
   if (manager == NULL) {
     return TID_ERROR;
   }
+  list_init(t->managers);
   t->manager = manager;
   manager->child_pid = tid;
   manager->parent_dead = false;

@@ -23,6 +23,9 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+static void child_exit(int, struct manager *);
+static void parent_exit(struct list *);
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -118,6 +121,16 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  struct manager *manager = cur->manager;
+  struct list *managers = cur->managers;
+
+  if (manager != NULL) {
+    child_exit(status, manager);
+  }
+  if (managers != NULL) {
+    parent_exit(managers);
+  }
+
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -497,4 +510,37 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+/* Child process writes its exit_status and frees manager if parent is dead. */
+static void child_exit(int status, struct manager *manager) {
+  lock_acquire(manager->rw_lock);
+  manager->exit_status = status;
+  sema_up(manager->wait_sema);
+
+  if (manager->parent_dead) {
+    free(manager);
+  } else {
+    lock_release(manager->rw_lock);
+  }
+}
+
+/* Parent process frees managers of dead children and tells live children that it's dead. */
+static void parent_exit(struct list *managers) {
+  struct list_elem *e = list_begin(managers);
+  struct manager *manager;
+
+  while (e != list_end(managers)) {
+    manager = list_entry(e, struct manager, elem);
+    lock_acquire(manager->rw_lock);
+
+    if (manager->exit_status < -1) {
+      manager->parent_dead = true;
+      e = list_next(e);
+      lock_release(manager->rw_lock);
+    } else {
+      e = list_next(e);
+      free(manager);
+    }
+  }
 }
