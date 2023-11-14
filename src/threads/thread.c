@@ -198,20 +198,32 @@ thread_create (const char *name, int priority,
      member cannot be observed. */
   old_level = intr_disable ();
 
-#ifdef USERPROG
   struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
-  if (manager == NULL) {
+  struct list *managers = (struct list *) malloc(sizeof(struct list));
+  struct semaphore *sema = (struct semaphore *) malloc(sizeof(struct semaphore));
+  struct lock *lock = (struct lock *) malloc(sizeof(struct lock));
+  if (manager == NULL || managers == NULL || sema == NULL || lock == NULL) {
+    free(manager);
+    free(managers);
+    free(sema);
+    free(lock);
     return TID_ERROR;
   }
-  list_init(t->managers);
+
+  list_init(managers);
+  sema_init(sema, 0);
+  lock_init(lock);
+
   t->manager = manager;
+  t->managers = managers;
+  manager->wait_sema = sema;
+  manager->rw_lock = lock;
   manager->child_pid = tid;
   manager->parent_dead = false;
-  t->exit_status = THREAD_ALIVE;
-  manager->exit_status = THREAD_ALIVE;
-  sema_init(manager->wait_sema, 0);
-  lock_init(manager->rw_lock);
+  t->exit_status = -2;
+  manager->exit_status = -2;
   list_push_back(thread_current()->managers, &manager->elem);
+#ifdef USERPROG
 #endif
 
   /* Stack frame for kernel_thread(). */
@@ -498,7 +510,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   /* Initialises file descriptors list. */
+  /* TODO: free(t->file_descriptors) */
+  struct list *list = (struct list *) malloc(sizeof(struct list));
   list_init(&t->file_descriptors);
+  t->file_descriptors = *list;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

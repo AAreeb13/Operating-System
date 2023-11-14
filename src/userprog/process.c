@@ -25,6 +25,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 static void child_exit(struct manager *);
 static void parent_exit(struct list *);
+static void free_manager(struct manager *);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -111,7 +112,7 @@ process_wait (tid_t child_tid)
       sema_down(manager->wait_sema);
       int exit_status = manager->exit_status;
       list_remove(&manager->elem);
-      free(manager);
+      free_manager(manager);
       return exit_status;
     }
   }
@@ -520,10 +521,10 @@ static void child_exit(struct manager *manager) {
   lock_acquire(manager->rw_lock);
 
   if (manager->parent_dead) {
-    free(manager);
+    free_manager(manager);
   } else {
-    if (thread_current()->exit_status == THREAD_ALIVE) {
-      manager->exit_status = KERNERL_THREAD_EXIT;
+    if (thread_current()->exit_status == -2) {
+      manager->exit_status = -1;
     } else {
       manager->exit_status = thread_current()->exit_status;
     }
@@ -540,13 +541,20 @@ static void parent_exit(struct list *managers) {
     manager = list_entry(e, struct manager, elem);
     lock_acquire(manager->rw_lock);
 
-    if (manager->exit_status == THREAD_ALIVE) {
+    if (manager->exit_status == -2) {
       manager->parent_dead = true;
       e = list_next(e);
       lock_release(manager->rw_lock);
     } else {
       e = list_next(e);
-      free(manager);
+      free_manager(manager);
     }
   }
+  free(managers);
+}
+
+static void free_manager(struct manager *manager) {
+  free(manager->rw_lock);
+  free(manager->wait_sema);
+  free(manager);
 }

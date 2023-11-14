@@ -25,10 +25,10 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#ifdef USERPROG
-#define THREAD_ALIVE -2                 /* Default value at execution */
-#define KERNEL_THREAD_EXIT -1           /* For when a thread dies via thread_exit() instead of sys_exit() */
-#endif USERPROG
+//#ifdef USERPROG
+//#define THREAD_ALIVE -2                 /* Default value at execution */
+//#define KERNEL_THREAD_EXIT -1           /* For when a thread dies via thread_exit() instead of sys_exit() */
+//#endif USERPROG
 
 /* A kernel thread or user process.
 
