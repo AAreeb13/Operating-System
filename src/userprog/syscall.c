@@ -38,6 +38,8 @@ static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
 static void sys_close(int);
 
+static struct lock *filesys_lock;
+
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
 Writing past end-of-file would normally extend the file, but file growth is not implemented
@@ -68,6 +70,9 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+
+  filesys_lock = (struct lock *) malloc(sizeof(struct lock));
+  lock_init(filesys_lock);
 }
 
 /* System calls handler that reroutes to correct system calls function depending on the value in
@@ -212,7 +217,9 @@ static void sys_exit(int status) {
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
   /* TODO: check return value of load. */
+  lock_acquire(filesys_lock);
   int result = process_execute(file);
+  lock_release(filesys_lock);
 
   return result;
 }
@@ -223,21 +230,27 @@ static int sys_wait(pid_t pid) {
 
 /* Creates a new file named by input with a specified size. */
 static bool sys_create(const char *file, unsigned initial_size) {
+  lock_acquire(filesys_lock);
   bool result = filesys_create(file, initial_size);
+  lock_release(filesys_lock);
 
   return result;
 }
 
 /* Deletes specified file if possible, returning a value depending on success or failure. */
 static bool sys_remove(const char *file) {
+  lock_acquire(filesys_lock);
   bool result = filesys_remove(file);
+  lock_release(filesys_lock);
 
   return result;
 }
 
 /* Opens the file specified. */
 static int sys_open(const char *file) {
+  lock_acquire(filesys_lock);
   struct file *f = filesys_open(file);
+  lock_release(filesys_lock);
 
   // Returns -1 if file does not exist.
   if (f == NULL) {
@@ -308,6 +321,11 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
       return 0;
     }
 
+    /* Handles sizes that are greater than 400 bytes and breaks it down. */
+    if (size > 400) {
+      return sys_write(fd, buffer, 400) + sys_write(fd, buffer + 400, size - 400);
+    }
+
     // Write to console using putbuf.
     putbuf(charBuffer, size);
 
@@ -315,6 +333,12 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
   } else if (fd > STDOUT_FILENUM) {
     struct thread *current_thread = thread_current();
     struct list_elem *e;
+    unsigned bufferSize = sizeof(buffer);
+
+    // Checks if size being written is not greater than buffer, otherwise it equates them if so.
+    if (size > bufferSize) {
+      size = bufferSize;
+    }
   
     for (e = list_begin(&current_thread->file_descriptors); 
          e != list_end(&current_thread->file_descriptors); 
