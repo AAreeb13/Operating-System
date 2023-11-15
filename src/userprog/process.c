@@ -66,7 +66,7 @@ process_execute (const char *file_name)
  *
  * */
 
-static void parse_arg(void **esp, char **file_copy, int count, int max_len) {
+static void parse_arg(void **esp, char *file_copy, int count, int max_len) {
   char *token, *save_ptr;
   char *stack_pointer = (char *) esp;
   //char arr[count][max_len+1];
@@ -93,13 +93,15 @@ static void parse_arg(void **esp, char **file_copy, int count, int max_len) {
   // Pushing the argument pointers
   for (int i = count -1; i >=0; i--) {
     stack_pointer--;
-    *stack_pointer = argv[i];
+    char **pointer = (char **) stack_pointer;
+    *pointer = argv[i];
   }
 
   // Pushing pointer to first arg
   char *pointer_copy = stack_pointer;
   stack_pointer--;
-  *stack_pointer = pointer_copy;
+  char **pointer = (char **) stack_pointer;
+  *pointer = pointer_copy;
 
   // Pushing argc
   stack_pointer -= sizeof (int);
@@ -107,7 +109,7 @@ static void parse_arg(void **esp, char **file_copy, int count, int max_len) {
 
   //Pushing return address 0
   stack_pointer--;
-  void **copy_pointer = (void **) stack_pointer;
+  copy_pointer = (void **) stack_pointer;
   *copy_pointer = NULL;
 }
 
@@ -151,7 +153,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   char *token, *save_ptr;
-  char file_copy[] = file_name_;
+  char file_copy[] = file_name;
   token = strtok_r(file_copy, " ", &save_ptr);
   success = load (token, &if_.eip, &if_.esp);
   int count = 0;
