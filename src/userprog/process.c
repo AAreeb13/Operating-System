@@ -20,6 +20,7 @@
 #include "threads/synch.h"
 #include "threads/malloc.h"
 
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -106,6 +107,7 @@ process_wait (tid_t child_tid)
   struct manager *manager;
   struct list *managers = thread_current()->managers;
 
+  if (thread_current()->pagedir != NULL) {
   for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
@@ -115,6 +117,7 @@ process_wait (tid_t child_tid)
       free_manager(manager);
       return exit_status;
     }
+  }
   }
   return TID_ERROR;
 }
