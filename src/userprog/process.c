@@ -153,7 +153,8 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   char *token, *save_ptr;
-  char file_copy[] = file_name;
+  char *file_copy;
+  strlcpy(file_name, file_copy, strlen(file_name) + 1);
   token = strtok_r(file_copy, " ", &save_ptr);
   success = load (token, &if_.eip, &if_.esp);
   int count = 0;
@@ -163,7 +164,7 @@ start_process (void *file_name_)
     count++;
     max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
   }
-  file_copy = file_name_;
+  strlcpy(file_name, file_copy, strlen(file_name) + 1);
   parse_arg(&if_.esp, file_copy, count, max_len);
 
 
