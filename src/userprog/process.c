@@ -19,13 +19,17 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
+#define MAX_ARGS 50
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 static void child_exit(struct manager *);
 static void parent_exit(struct list *);
+
 static void free_manager(struct manager *);
+
+static void parse_arg(void **, char *, int, int);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -51,6 +55,85 @@ process_execute (const char *file_name)
   return tid;
 }
 
+/* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
+ * Takes in interrupt frame, token and save_ptr to setup user stack
+ * What it needs to do:
+ * Put arguments in reverse oredr
+ * Remember the pointer to the arguments so that you can put them in later on
+ * Put 0 after putting the actual arguments
+ * You can go through the tokens once and then again, firs ttime to get num of elements
+ *
+ * */
+
+static void parse_arg(void **esp, char **file_copy, int count, int max_len) {
+  char *token, *save_ptr;
+  char *stack_pointer = (char *) esp;
+  //char arr[count][max_len+1];
+  int argc = count - 1;
+  char *argv[count];
+
+
+  /* Push the arguments in the stack in the original order but store them in the array in opposite order */
+  for (token = strtok_r (file_copy, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    size_t len = strlen(token) + 1;
+    stack_pointer = stack_pointer - len;
+    strlcpy(stack_pointer, token, len);
+    argv[argc] = stack_pointer;
+    argc--;
+
+  }
+
+  // Pushing Null pointer sentinel
+  stack_pointer--;
+  void **copy_pointer = (void **) stack_pointer;
+  *copy_pointer = NULL;
+
+  // Pushing the argument pointers
+  for (int i = count -1; i >=0; i--) {
+    stack_pointer--;
+    *stack_pointer = argv[i];
+  }
+
+  // Pushing pointer to first arg
+  char *pointer_copy = stack_pointer;
+  stack_pointer--;
+  *stack_pointer = pointer_copy;
+
+  // Pushing argc
+  stack_pointer -= sizeof (int);
+  *stack_pointer = count;
+
+  //Pushing return address 0
+  stack_pointer--;
+  void **copy_pointer = (void **) stack_pointer;
+  *copy_pointer = NULL;
+}
+
+
+// void parse_arg0(void **esp, char **file_copy, int count, int max_len) {
+//  char *token, *save_ptr;
+//  char *argv[MAX_ARGS];  // Define a maximum number of arguments (MAX_ARGS)
+//  int argc = 0;
+//
+//// Tokenize the command line and store tokens in argv[]
+//  for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
+//    argv[argc++] = token;
+//    if (argc >= MAX_ARGS) {
+//      // Handle too many arguments error
+//      break;
+//    }
+//  }
+//
+//// Set the last element of argv[] to NULL as a sentinel indicating the end of arguments
+//  argv[argc] = NULL;
+//
+//
+//}
+
+
+
+
 /* A thread function that loads a user process and starts it
    running. */
 static void
@@ -67,8 +150,20 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   char *token, *save_ptr;
-  token = strtok_r(file_name_, " ", &save_ptr);
+  char file_copy[] = file_name_;
+  token = strtok_r(file_copy, " ", &save_ptr);
   success = load (token, &if_.eip, &if_.esp);
+  int count = 0;
+  int max_len = strlen(token);
+  while (token != NULL) {
+    token = strtok_r(NULL, " ", &save_ptr);
+    count++;
+    max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
+  }
+  file_copy = file_name_;
+  parse_arg(&if_.esp, file_copy, count, max_len);
+
+
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -489,7 +584,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE-12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
