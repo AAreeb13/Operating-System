@@ -59,7 +59,7 @@ process_execute (const char *file_name)
 /* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
  * Takes in interrupt frame, token and save_ptr to setup user stack
  * What it needs to do:
- * Put arguments in reverse oredr
+ * Put arguments in reverse order
  * Remember the pointer to the arguments so that you can put them in later on
  * Put 0 after putting the actual arguments
  * You can go through the tokens once and then again, firs ttime to get num of elements
@@ -153,7 +153,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   char *token, *save_ptr;
-  char *file_copy;
+  char file_copy[strlen(file_name) + 1];
   strlcpy(file_name, file_copy, strlen(file_name) + 1);
   token = strtok_r(file_copy, " ", &save_ptr);
   success = load (token, &if_.eip, &if_.esp);
@@ -162,7 +162,7 @@ start_process (void *file_name_)
   while (token != NULL) {
     token = strtok_r(NULL, " ", &save_ptr);
     count++;
-    max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
+    //max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
   }
   strlcpy(file_name, file_copy, strlen(file_name) + 1);
   parse_arg(&if_.esp, file_copy, count, max_len);
