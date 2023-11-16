@@ -102,7 +102,7 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct list file_descriptors;       /* List of file descriptors. */
+    struct list *file_descriptors;       /* List of file descriptors. */
     struct list *managers;
     struct manager *manager;
     int exit_status;

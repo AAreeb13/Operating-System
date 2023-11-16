@@ -519,7 +519,7 @@ init_thread (struct thread *t, const char *name, int priority)
     t->exit_status = -2;
     manager->exit_status = -2;
     list_push_back(thread_current()->managers, &manager->elem);
-    t->file_descriptors = *fd_list;
+    t->file_descriptors = fd_list;
   } else if (strcmp(name, "main") == 0) {
     struct list *managers = (struct list *) malloc(sizeof(struct list));
     t->managers = managers;

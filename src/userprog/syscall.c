@@ -267,7 +267,7 @@ static int sys_open(const char *file) {
 
   fd_elem->file = f;
   fd_elem->fd = allocate_fd();
-  list_push_back(&thread_current()->file_descriptors, &fd_elem->elem);
+  list_push_back(thread_current()->file_descriptors, &fd_elem->elem);
   return fd_elem->fd;
 }
 
@@ -340,8 +340,8 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
       size = bufferSize;
     }
   
-    for (e = list_begin(&current_thread->file_descriptors); 
-         e != list_end(&current_thread->file_descriptors); 
+    for (e = list_begin(current_thread->file_descriptors); 
+         e != list_end(current_thread->file_descriptors); 
          e = list_next(e)) {
       struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
   
@@ -392,8 +392,8 @@ static void sys_close(int fd) {
     file_close(file);
     struct list_elem *e;
 
-    for (e = list_begin(&current_thread->file_descriptors); 
-         e != list_end(&current_thread->file_descriptors); 
+    for (e = list_begin(current_thread->file_descriptors); 
+         e != list_end(current_thread->file_descriptors); 
          e = list_next(e)) {
       struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
 
@@ -408,19 +408,19 @@ static void sys_close(int fd) {
 
 /* Finds an available fd value by iterating through file_descriptors of thread. */
 int allocate_fd(void) {
-  struct thread *thread = thread_current();
+  struct thread *current_thread = thread_current();
   int fd = 2; // Starts from 2 to avoid conflicts with standard input/output values.
   struct list_elem *e;
 
-  for (e = list_begin(&thread->file_descriptors); 
-       e != list_end(&thread->file_descriptors); 
+  for (e = list_begin(current_thread->file_descriptors); 
+       e != list_end(current_thread->file_descriptors); 
        e = list_next(e)) {
     struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
     
     if (fd_elem->fd == fd) {
       // If the fd value is here, it will restart the loop with a higher fd value.
       fd++;
-      e = list_begin(&thread->file_descriptors);
+      e = list_begin(current_thread->file_descriptors);
     }
   }
 
@@ -430,10 +430,10 @@ int allocate_fd(void) {
 /* Grabs the file associated with an fd value from some thread. */
 struct file *fd_to_file(int fd) {
   struct list_elem *e;
-  struct thread *thread = thread_current();
+  struct thread *current_thread = thread_current();
 
-  for (e = list_begin(&thread->file_descriptors); 
-       e != list_end(&thread->file_descriptors); 
+  for (e = list_begin(current_thread->file_descriptors); 
+       e != list_end(current_thread->file_descriptors); 
        e = list_next(e)) {
     struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
 
