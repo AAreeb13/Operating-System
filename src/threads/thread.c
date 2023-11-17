@@ -109,6 +109,9 @@ thread_start (void)
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
+  struct list *managers = (struct list *) malloc(sizeof(struct list));
+  list_init(managers);
+  thread_current()->managers = managers;
   thread_create ("idle", PRI_MIN, idle, &idle_started);
 
   /* Start preemptive thread scheduling. */
@@ -198,10 +201,6 @@ thread_create (const char *name, int priority,
      member cannot be observed. */
   old_level = intr_disable ();
 
-#ifdef USERPROG
-  t->manager->child_pid = tid;
-#endif
-
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -218,6 +217,42 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   intr_set_level (old_level);
+
+#ifdef USERPROG
+  if (strcmp(name, "idle") != 0) {
+  /* Initialises file descriptors list. */
+  struct list *fd_list = (struct list *) malloc(sizeof(struct list));
+
+  struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
+  struct list *managers = (struct list *) malloc(sizeof(struct list));
+  struct semaphore *sema = (struct semaphore *) malloc(sizeof(struct semaphore));
+  struct lock *lock = (struct lock *) malloc(sizeof(struct lock));
+
+  if (manager == NULL || managers == NULL || sema == NULL || lock == NULL || fd_list == NULL) {
+    free(manager);
+    free(managers);
+    free(sema);
+    free(lock);
+    free(fd_list);
+  }
+
+  list_init(managers);
+  sema_init(sema, 0);
+  lock_init(lock);
+  list_init(fd_list);
+
+  t->manager = manager;
+  t->managers = managers;
+  manager->wait_sema = sema;
+  manager->rw_lock = lock;
+  manager->parent_dead = false;
+  t->exit_status = -2;
+  manager->exit_status = -2;
+  manager->child_pid = tid;
+  list_push_back(thread_current()->managers, &manager->elem);
+  t->file_descriptors = fd_list;
+  }
+#endif
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -488,42 +523,46 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
 #ifdef USERPROG
-  if (strcmp(name, "idle") != 0 && strcmp(name, "main") != 0) {
-    /* Initialises file descriptors list. */
-    struct list *fd_list = (struct list *) malloc(sizeof(struct list));
-
-    struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
-    struct list *managers = (struct list *) malloc(sizeof(struct list));
-    struct semaphore *sema = (struct semaphore *) malloc(sizeof(struct semaphore));
-    struct lock *lock = (struct lock *) malloc(sizeof(struct lock));
-
-    if (manager == NULL || managers == NULL || sema == NULL || lock == NULL || fd_list == NULL) {
-      free(manager);
-      free(managers);
-      free(sema);
-      free(lock);
-      free(fd_list);
-    }
-
-    list_init(managers);
-    sema_init(sema, 0);
-    lock_init(lock);
-    list_init(fd_list);
-
-    t->manager = manager;
-    t->managers = managers;
-    manager->wait_sema = sema;
-    manager->rw_lock = lock;
-
-    manager->parent_dead = false;
-    t->exit_status = -2;
-    manager->exit_status = -2;
-    list_push_back(thread_current()->managers, &manager->elem);
-    t->file_descriptors = fd_list;
-  } else if (strcmp(name, "main") == 0) {
-    struct list *managers = (struct list *) malloc(sizeof(struct list));
-    t->managers = managers;
-  }
+//  if (strcmp(name, "idle") != 0 && strcmp(name, "main") != 0) {
+//    /* Initialises file descriptors list. */
+//    struct list *fd_list = (struct list *) malloc(sizeof(struct list));
+//
+//    struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
+//    struct list *managers = (struct list *) malloc(sizeof(struct list));
+//    struct semaphore *sema = (struct semaphore *) malloc(sizeof(struct semaphore));
+//    struct lock *lock = (struct lock *) malloc(sizeof(struct lock));
+//
+//    if (manager == NULL || managers == NULL || sema == NULL || lock == NULL || fd_list == NULL) {
+//      free(manager);
+//      free(managers);
+//      free(sema);
+//      free(lock);
+//      free(fd_list);
+//    }
+//
+//    list_init(managers);
+//    sema_init(sema, 0);
+//    lock_init(lock);
+//    list_init(fd_list);
+//
+//    t->manager = manager;
+//    t->managers = managers;
+//    manager->wait_sema = sema;
+//    manager->rw_lock = lock;
+//
+//    manager->parent_dead = false;
+//    t->exit_status = -2;
+//    manager->exit_status = -2;
+//    list_push_back(thread_current()->managers, &manager->elem);
+//    t->file_descriptors = fd_list;
+//  } else if (strcmp(name, "main") == 0) {
+//    struct list *managers = (struct list *) malloc(sizeof(struct list));
+//    t->managers = managers;
+//  }
+//  if (strcmp(name, "main") == 0) {
+//    struct list *managers = (struct list *) malloc(sizeof(struct list));
+//    t->managers = managers;
+//  }
 #endif
   intr_set_level (old_level);
 }

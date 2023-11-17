@@ -30,10 +30,10 @@ static void parent_exit(struct list *);
 
 static void free_manager(struct manager *);
 
-static void parse_arg(void **, char *, int, int);
+static void parse_arg(void *, char *, int, int);
 
 /* Starts a new thread running a user program loaded from
-   FILENAME.  The new thread may be scheduled (and may even exit)
+   FILENAME. The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
@@ -62,11 +62,11 @@ process_execute (const char *file_name)
  * Put arguments in reverse order
  * Remember the pointer to the arguments so that you can put them in later on
  * Put 0 after putting the actual arguments
- * You can go through the tokens once and then again, firs ttime to get num of elements
+ * You can go through the tokens once and then again, first time to get num of elements
  *
  * */
 
-static void parse_arg(void **esp, char *file_copy, int count, int max_len) {
+static void parse_arg(void *esp, char *file_copy, int count, int max_len) {
   char *token, *save_ptr;
   char *stack_pointer = (char *) esp;
   //char arr[count][max_len+1];
@@ -82,34 +82,34 @@ static void parse_arg(void **esp, char *file_copy, int count, int max_len) {
     strlcpy(stack_pointer, token, len);
     argv[argc] = stack_pointer;
     argc--;
-
   }
 
   // Pushing Null pointer sentinel
-  stack_pointer--;
   void **copy_pointer = (void **) stack_pointer;
+  copy_pointer--;
+  //stack_pointer = (char *) copy_pointer;
   *copy_pointer = NULL;
 
   // Pushing the argument pointers
   for (int i = count -1; i >=0; i--) {
-    stack_pointer--;
-    char **pointer = (char **) stack_pointer;
+    copy_pointer--;
+    char **pointer = (char **) copy_pointer;
     *pointer = argv[i];
   }
 
   // Pushing pointer to first arg
-  char *pointer_copy = stack_pointer;
-  stack_pointer--;
-  char **pointer = (char **) stack_pointer;
+  char *pointer_copy = (char *) copy_pointer;
+  copy_pointer--;
+  char **pointer = (char **) copy_pointer;
   *pointer = pointer_copy;
 
   // Pushing argc
-  stack_pointer -= sizeof (int);
-  *stack_pointer = count;
+  copy_pointer --;
+  *(int *)copy_pointer = count;
 
   //Pushing return address 0
-  stack_pointer--;
-  copy_pointer = (void **) stack_pointer;
+  copy_pointer--;
+  //copy_pointer = (void **) stack_pointer;
   *copy_pointer = NULL;
 }
 
@@ -154,7 +154,7 @@ start_process (void *file_name_)
 
   char *token, *save_ptr;
   char file_copy[strlen(file_name) + 1];
-  strlcpy(file_name, file_copy, strlen(file_name) + 1);
+  strlcpy(file_copy, file_name, strlen(file_name) + 1);
   token = strtok_r(file_copy, " ", &save_ptr);
   success = load (token, &if_.eip, &if_.esp);
   int count = 0;
@@ -164,8 +164,8 @@ start_process (void *file_name_)
     count++;
     //max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
   }
-  strlcpy(file_name, file_copy, strlen(file_name) + 1);
-  parse_arg(&if_.esp, file_copy, count, max_len);
+  strlcpy(file_copy, file_name, strlen(file_name) + 1);
+  parse_arg(if_.esp, file_copy, count, max_len);
 
 
 
@@ -200,12 +200,14 @@ process_wait (tid_t child_tid)
     return TID_ERROR;
   }
 
+
+
   /* Traverse managers and wait on child process if valid. */
   struct list_elem *e;
   struct manager *manager;
   struct list *managers = thread_current()->managers;
 
-  if (thread_current()->pagedir != NULL) {
+  //if (thread_current()->pagedir != NULL) {
   for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
@@ -216,7 +218,7 @@ process_wait (tid_t child_tid)
       return exit_status;
     }
   }
-  }
+  //}
   return TID_ERROR;
 }
 
@@ -629,6 +631,7 @@ static void child_exit(struct manager *manager) {
     } else {
       manager->exit_status = thread_current()->exit_status;
     }
+    sema_up(manager->wait_sema);
     lock_release(manager->rw_lock);
   }
 }
