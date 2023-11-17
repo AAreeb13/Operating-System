@@ -30,7 +30,7 @@ static void parent_exit(struct list *);
 
 static void free_manager(struct manager *);
 
-static void parse_arg(void *, char *, int, int);
+static void **parse_arg(void *, char *, int, int);
 
 /* Starts a new thread running a user program loaded from
    FILENAME. The new thread may be scheduled (and may even exit)
@@ -66,7 +66,7 @@ process_execute (const char *file_name)
  *
  * */
 
-static void ** parse_arg(void *esp, char *file_copy, int count, int max_len) {
+static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
   char *token, *save_ptr;
   char *stack_pointer = (char *) esp;
   //char arr[count][max_len+1];
