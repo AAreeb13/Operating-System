@@ -66,7 +66,7 @@ process_execute (const char *file_name)
  *
  * */
 
-static void parse_arg(void *esp, char *file_copy, int count, int max_len) {
+static void ** parse_arg(void *esp, char *file_copy, int count, int max_len) {
   char *token, *save_ptr;
   char *stack_pointer = (char *) esp;
   //char arr[count][max_len+1];
@@ -105,12 +105,14 @@ static void parse_arg(void *esp, char *file_copy, int count, int max_len) {
 
   // Pushing argc
   copy_pointer --;
-  *(int *)copy_pointer = count;
+  *((int *)copy_pointer) = count;
 
   //Pushing return address 0
   copy_pointer--;
   //copy_pointer = (void **) stack_pointer;
   *copy_pointer = NULL;
+
+  return copy_pointer;
 }
 
 
@@ -165,7 +167,7 @@ start_process (void *file_name_)
     //max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
   }
   strlcpy(file_copy, file_name, strlen(file_name) + 1);
-  parse_arg(if_.esp, file_copy, count, max_len);
+  if_.esp = parse_arg(if_.esp, file_copy, count, max_len);
 
 
 
