@@ -51,8 +51,8 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  if (tid == TID_ERROR) 
+    palloc_free_page (fn_copy);
   return tid;
 }
 
@@ -157,6 +157,12 @@ start_process (void *file_name_)
   strlcpy(file_name, file_copy, strlen(file_name) + 1);
   token = strtok_r(file_copy, " ", &save_ptr);
   success = load (token, &if_.eip, &if_.esp);
+
+  // Deny writes to the executable file.
+  struct file *file = filesys_open (token);
+  file_deny_write(token);
+  thread_current()->executable = token;
+
   int count = 0;
   int max_len = strlen(token);
   while (token != NULL) {
@@ -229,13 +235,14 @@ process_exit (void)
   struct manager *manager = cur->manager;
   struct list *managers = cur->managers;
 
+  file_close(cur->executable);
+
   if (manager != NULL) {
     child_exit(manager);
   }
   if (managers != NULL) {
     parent_exit(managers);
   }
-
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

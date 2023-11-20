@@ -106,6 +106,7 @@ struct thread
     struct list *managers;
     struct manager *manager;
     int exit_status;
+    struct file *executable;    /* Executable file associated with thread. */
 #endif
 
     /* Owned by thread.c. */
