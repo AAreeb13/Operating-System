@@ -188,7 +188,7 @@ thread_create (const char *name, int priority,
 
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
-  if (t == NULL)
+  if (t == NULL) 
     return TID_ERROR;
 
   /* Initialize thread. */
@@ -523,6 +523,8 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
 #ifdef USERPROG
+  t->executable = NULL;
+
 //  if (strcmp(name, "idle") != 0 && strcmp(name, "main") != 0) {
 //    /* Initialises file descriptors list. */
 //    struct list *fd_list = (struct list *) malloc(sizeof(struct list));
