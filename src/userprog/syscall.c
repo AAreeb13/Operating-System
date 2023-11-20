@@ -11,6 +11,7 @@
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
 #include "threads/synch.h"
+#include "lib/string.h"
 
 static void syscall_handler (struct intr_frame *);
 static void access_user_mem (const void *);
@@ -333,12 +334,15 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
   } else if (fd > STDOUT_FILENUM) {
     struct thread *current_thread = thread_current();
     struct list_elem *e;
-    unsigned bufferSize = sizeof(buffer);
+
+    /* String.h was added. This seems obselete. Kept for now.
+    unsigned bufferSize = strlen(buffer) + 1;
 
     // Checks if size being written is not greater than buffer, otherwise it equates them if so.
     if (size > bufferSize) {
       size = bufferSize;
     }
+    */
   
     for (e = list_begin(current_thread->file_descriptors); 
          e != list_end(current_thread->file_descriptors); 
