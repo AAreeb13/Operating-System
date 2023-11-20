@@ -91,7 +91,7 @@ static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
   *copy_pointer = NULL;
 
   // Pushing the argument pointers
-  for (int i = count -1; i >=0; i--) {
+  for (int i = 0; i <= count - 1; i++) {
     copy_pointer--;
     char **pointer = (char **) copy_pointer;
     *pointer = argv[i];
@@ -111,7 +111,6 @@ static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
   copy_pointer--;
   //copy_pointer = (void **) stack_pointer;
   *copy_pointer = NULL;
-
   return copy_pointer;
 }
 
@@ -158,6 +157,7 @@ start_process (void *file_name_)
   char file_copy[strlen(file_name) + 1];
   strlcpy(file_copy, file_name, strlen(file_name) + 1);
   token = strtok_r(file_copy, " ", &save_ptr);
+  strlcpy(thread_current()->name, token, sizeof thread_current()->name);
   success = load (token, &if_.eip, &if_.esp);
   int count = 0;
   int max_len = strlen(token);
@@ -168,7 +168,7 @@ start_process (void *file_name_)
   }
   strlcpy(file_copy, file_name, strlen(file_name) + 1);
   if_.esp = parse_arg(if_.esp, file_copy, count, max_len);
-
+  //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
 
   /* If load failed, quit. */

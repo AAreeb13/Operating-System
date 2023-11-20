@@ -115,7 +115,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_EXEC:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_exec((void *) arg1);
+      result = sys_exec((void *) *arg1);
       success = true;
       break;
 
@@ -127,19 +127,19 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_CREATE:
       syscall_args_check(syscall_number_address, 2);
-      result = sys_create((void *) arg1, *arg2);
+      result = sys_create((void *) *arg1, *arg2);
       success = true;
       break;
 
     case SYS_REMOVE:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_remove((void *) arg1);
+      result = sys_remove((void *) *arg1);
       success = true;
       break;
 
     case SYS_OPEN:
       syscall_args_check(syscall_number_address, 1);
-      result = sys_open((void *) arg1);
+      result = sys_open((void *) *arg1);
       success = true;
       break;
 
@@ -151,13 +151,13 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_READ:
       syscall_args_check(syscall_number_address, 3);
-      result = sys_read(*arg1, (void *) arg2, *arg3);
+      result = sys_read(*arg1, (void *) *arg2, *arg3);
       success = true;
       break;
 
     case SYS_WRITE:
       syscall_args_check(syscall_number_address, 3);
-      result = sys_write(*arg1, (void *) arg2, *arg3);
+      result = sys_write(*arg1, (void *) *arg2, *arg3);
       success = true;
       break;
 
