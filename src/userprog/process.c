@@ -160,10 +160,10 @@ start_process (void *file_name_)
   strlcpy(thread_current()->name, token, sizeof thread_current()->name);
   success = load (token, &if_.eip, &if_.esp);
 
-  // Deny writes to the executable file.
-  struct file *file = filesys_open (token);
-  file_deny_write(token);
-  thread_current()->executable = token;
+//  // Deny writes to the executable file.
+//  struct file *file = filesys_open (token);
+//  file_deny_write(token);
+//  thread_current()->executable = token;
 
   int count = 0;
   int max_len = strlen(token);
@@ -239,7 +239,7 @@ process_exit (void)
   struct manager *manager = cur->manager;
   struct list *managers = cur->managers;
 
-  file_close(cur->executable);
+  //file_close(cur->executable);
 
   if (manager != NULL) {
     child_exit(manager);
