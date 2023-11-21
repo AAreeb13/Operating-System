@@ -84,6 +84,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   /* Creates a pointer to 32 bit system call number from SP and dereferences it. */
   uint32_t *syscall_number_address = (uint32_t *) f->esp;
   access_user_mem(syscall_number_address);
+  
   uint32_t syscall_number = *syscall_number_address;
 
   /* Parameter values grabbed for system calls. */
@@ -99,8 +100,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   if (syscall_number < SYSCALL_MIN || syscall_number > SYSCALL_MAX) {
     sys_exit(-1);
   }
-
-  access_user_mem(syscall_number_address);
   
   // TODO: Use tables to hold functions and args over switch statements and passing args.
 
@@ -219,6 +218,7 @@ static void sys_exit(int status) {
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
   /* TODO: check return value of load. */
+  access_user_mem(file);
   lock_acquire(filesys_lock);
   int result = process_execute(file);
   lock_release(filesys_lock);
@@ -242,6 +242,7 @@ static bool sys_create(const char *file, unsigned initial_size) {
 
 /* Deletes specified file if possible, returning a value depending on success or failure. */
 static bool sys_remove(const char *file) {
+  access_user_mem(file);
   lock_acquire(filesys_lock);
   bool result = filesys_remove(file);
   lock_release(filesys_lock);
