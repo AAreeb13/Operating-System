@@ -19,7 +19,6 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
-#define MAX_ARGS 50
 
 
 static thread_func start_process NO_RETURN;
@@ -611,6 +610,7 @@ static void free_manager(struct manager *manager) {
  *
  * */
 
+
 static void **parse_arg(void *esp, char *file_copy, int count) {
   char *token, *save_ptr;
   char *char_pointer = (char *) esp;
@@ -654,5 +654,6 @@ static void **parse_arg(void *esp, char *file_copy, int count) {
   void_star_pointer = (void **) char_star_pointer;
   void_star_pointer--;
   *void_star_pointer = NULL;
+
   return void_star_pointer;
 }
