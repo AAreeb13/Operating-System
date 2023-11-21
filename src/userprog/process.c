@@ -30,7 +30,7 @@ static void parent_exit(struct list *);
 
 static void free_manager(struct manager *);
 
-static void **parse_arg(void *, char *, int, int);
+static void **parse_arg(void *, char *, int);
 
 /* Starts a new thread running a user program loaded from
    FILENAME. The new thread may be scheduled (and may even exit)
@@ -93,23 +93,19 @@ start_process (void *file_name_)
     thread_current()->manager->load_status = 1;
     thread_current()->executable = filesys_open(token);
     file_deny_write(thread_current()->executable);
-  } else {
-    thread_current()->manager->load_status = -1;
-  }
-  sema_up(thread_current()->manager->wait_sema);
 
-  if (success) {
-
+    /* Counts number of arguments and sets up stack */
     int count = 0;
-    int max_len = strlen(token);
     while (token != NULL) {
       token = strtok_r(NULL, " ", &save_ptr);
       count++;
     }
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
-    if_.esp = parse_arg(if_.esp, file_copy, count, max_len);
-    //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+    if_.esp = parse_arg(if_.esp, file_copy, count);
+  } else {
+    thread_current()->manager->load_status = -1;
   }
+  sema_up(thread_current()->manager->wait_sema);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -615,11 +611,10 @@ static void free_manager(struct manager *manager) {
  *
  * */
 
-static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
+static void **parse_arg(void *esp, char *file_copy, int count) {
   char *token, *save_ptr;
-  char *stack_pointer = (char *) esp;
-  //char arr[count][max_len+1];
-  int argc = count - 1;
+  char *char_pointer = (char *) esp;
+  int counter = count - 1;
   char *argv[count];
 
 
@@ -627,38 +622,37 @@ static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
   for (token = strtok_r (file_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
     size_t len = strlen(token) + 1;
-    stack_pointer = stack_pointer - len;
-    strlcpy(stack_pointer, token, len);
-    argv[argc] = stack_pointer;
-    argc--;
+    char_pointer = char_pointer - len;
+    strlcpy(char_pointer, token, len);
+    argv[counter] = char_pointer;
+    counter--;
   }
 
-  // Pushing Null pointer sentinel
-  void **copy_pointer = (void **) stack_pointer;
-  copy_pointer--;
-  //stack_pointer = (char *) copy_pointer;
-  *copy_pointer = NULL;
+  /* Push Null pointer sentinel */
+  void **void_star_pointer = (void **) char_pointer;
+  void_star_pointer--;
+  *void_star_pointer = NULL;
 
-  // Pushing the argument pointers
+
+  /* Push the argument pointers */
+  char **char_star_pointer = (char **) void_star_pointer;
   for (int i = 0; i <= count - 1; i++) {
-    copy_pointer--;
-    char **pointer = (char **) copy_pointer;
-    *pointer = argv[i];
+    char_star_pointer--;
+    *char_star_pointer = argv[i];
   }
 
-  // Pushing pointer to first arg
-  char *pointer_copy = (char *) copy_pointer;
-  copy_pointer--;
-  char **pointer = (char **) copy_pointer;
-  *pointer = pointer_copy;
+  /* Push pointer to first arg */
+  char *pointer_copy = (char *) char_star_pointer;
+  char_star_pointer--;
+  *char_star_pointer = pointer_copy;
 
-  // Pushing argc
-  copy_pointer --;
-  *((int *)copy_pointer) = count;
+  /* Push argc */
+  char_star_pointer --;
+  *((int *)char_star_pointer) = count;
 
-  //Pushing return address 0
-  copy_pointer--;
-  //copy_pointer = (void **) stack_pointer;
-  *copy_pointer = NULL;
-  return copy_pointer;
+  /* Push return address 0 */
+  void_star_pointer = (void **) char_star_pointer;
+  void_star_pointer--;
+  *void_star_pointer = NULL;
+  return void_star_pointer;
 }
