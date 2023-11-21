@@ -175,8 +175,23 @@ process_exit (void)
   if (manager != NULL) {
     child_exit(manager);
   }
+
   if (managers != NULL) {
     parent_exit(managers);
+  }
+
+  if (cur->file_descriptors != NULL) {
+    struct list *fds = cur->file_descriptors;
+    struct list_elem *e = list_begin(fds);
+    struct file_descriptor *fd;
+    
+    while (e != list_end(fds)) {
+      fd = list_entry(e, struct file_descriptor, elem);
+      file_close(fd->file);
+      list_remove(e);
+      e = list_next(e);
+      free(fd);
+    }
   }
 
   /* Destroy the current process's page directory and switch back

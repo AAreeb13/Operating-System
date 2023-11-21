@@ -206,6 +206,7 @@ static void access_user_mem (const void *uaddr) {
 
 /* Terminates Pintos. */
 static void sys_halt(void) {
+  free(filesys_lock);
   shutdown_power_off();
 }
 
