@@ -105,7 +105,6 @@ start_process (void *file_name_)
     while (token != NULL) {
       token = strtok_r(NULL, " ", &save_ptr);
       count++;
-      //max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
     }
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
     if_.esp = parse_arg(if_.esp, file_copy, count, max_len);
