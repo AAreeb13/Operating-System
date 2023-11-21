@@ -248,6 +248,7 @@ thread_create (const char *name, int priority,
   manager->parent_dead = false;
   t->exit_status = -2;
   manager->exit_status = -2;
+  manager->load_status = 0;
   manager->child_pid = tid;
   list_push_back(thread_current()->managers, &manager->elem);
   t->file_descriptors = fd_list;

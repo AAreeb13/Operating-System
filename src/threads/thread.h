@@ -105,6 +105,7 @@ struct thread
     struct list *file_descriptors;       /* List of file descriptors. */
     struct list *managers;
     struct manager *manager;
+    bool child_load_success;
     int exit_status;
     struct file *executable;    /* Executable file associated with thread. */
 #endif
@@ -123,6 +124,7 @@ struct file_descriptor {
 struct manager {
   tid_t child_pid;
   int exit_status;                      /* Child processes will write their exit_status. */
+  int load_status;
   bool parent_dead;
   struct semaphore *wait_sema;          /* For making parent wait. */
   struct lock *rw_lock;                 /* For reading and writing. */

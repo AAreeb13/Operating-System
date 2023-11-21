@@ -53,65 +53,17 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) 
     palloc_free_page (fn_copy);
+
+  struct list *managers = thread_current()->managers;
+  struct manager *manager; struct list_elem *e;
+  for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
+    manager = list_entry(e, struct manager, elem);
+    if (manager->child_pid == tid) {
+      sema_down(manager->wait_sema);
+      return manager->load_status == 1 ? tid : TID_ERROR;
+    }
+  }
   return tid;
-}
-
-/* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
- * Takes in interrupt frame, token and save_ptr to setup user stack
- * What it needs to do:
- * Put arguments in reverse order
- * Remember the pointer to the arguments so that you can put them in later on
- * Put 0 after putting the actual arguments
- * You can go through the tokens once and then again, first time to get num of elements
- *
- * */
-
-static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
-  char *token, *save_ptr;
-  char *stack_pointer = (char *) esp;
-  //char arr[count][max_len+1];
-  int argc = count - 1;
-  char *argv[count];
-
-
-  /* Push the arguments in the stack in the original order but store them in the array in opposite order */
-  for (token = strtok_r (file_copy, " ", &save_ptr); token != NULL;
-       token = strtok_r (NULL, " ", &save_ptr)) {
-    size_t len = strlen(token) + 1;
-    stack_pointer = stack_pointer - len;
-    strlcpy(stack_pointer, token, len);
-    argv[argc] = stack_pointer;
-    argc--;
-  }
-
-  // Pushing Null pointer sentinel
-  void **copy_pointer = (void **) stack_pointer;
-  copy_pointer--;
-  //stack_pointer = (char *) copy_pointer;
-  *copy_pointer = NULL;
-
-  // Pushing the argument pointers
-  for (int i = 0; i <= count - 1; i++) {
-    copy_pointer--;
-    char **pointer = (char **) copy_pointer;
-    *pointer = argv[i];
-  }
-
-  // Pushing pointer to first arg
-  char *pointer_copy = (char *) copy_pointer;
-  copy_pointer--;
-  char **pointer = (char **) copy_pointer;
-  *pointer = pointer_copy;
-
-  // Pushing argc
-  copy_pointer --;
-  *((int *)copy_pointer) = count;
-
-  //Pushing return address 0
-  copy_pointer--;
-  //copy_pointer = (void **) stack_pointer;
-  *copy_pointer = NULL;
-  return copy_pointer;
 }
 
 /* A thread function that loads a user process and starts it
@@ -138,9 +90,13 @@ start_process (void *file_name_)
 
   // Deny writes to the executable file.
   if (success) {
+    thread_current()->manager->load_status = 1;
     thread_current()->executable = filesys_open(token);
     file_deny_write(thread_current()->executable);
+  } else {
+    thread_current()->manager->load_status = -1;
   }
+  sema_up(thread_current()->manager->wait_sema);
 
   int count = 0;
   int max_len = strlen(token);
@@ -156,7 +112,7 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
@@ -185,14 +141,11 @@ process_wait (tid_t child_tid)
     return TID_ERROR;
   }
 
-
-
   /* Traverse managers and wait on child process if valid. */
   struct list_elem *e;
   struct manager *manager;
   struct list *managers = thread_current()->managers;
 
-  //if (thread_current()->pagedir != NULL) {
   for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
@@ -203,7 +156,6 @@ process_wait (tid_t child_tid)
       return exit_status;
     }
   }
-  //}
   return TID_ERROR;
 }
 
@@ -650,4 +602,62 @@ static void free_manager(struct manager *manager) {
   free(manager->rw_lock);
   free(manager->wait_sema);
   free(manager);
+}
+
+/* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
+ * Takes in interrupt frame, token and save_ptr to setup user stack
+ * What it needs to do:
+ * Put arguments in reverse order
+ * Remember the pointer to the arguments so that you can put them in later on
+ * Put 0 after putting the actual arguments
+ * You can go through the tokens once and then again, first time to get num of elements
+ *
+ * */
+
+static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
+  char *token, *save_ptr;
+  char *stack_pointer = (char *) esp;
+  //char arr[count][max_len+1];
+  int argc = count - 1;
+  char *argv[count];
+
+
+  /* Push the arguments in the stack in the original order but store them in the array in opposite order */
+  for (token = strtok_r (file_copy, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    size_t len = strlen(token) + 1;
+    stack_pointer = stack_pointer - len;
+    strlcpy(stack_pointer, token, len);
+    argv[argc] = stack_pointer;
+    argc--;
+  }
+
+  // Pushing Null pointer sentinel
+  void **copy_pointer = (void **) stack_pointer;
+  copy_pointer--;
+  //stack_pointer = (char *) copy_pointer;
+  *copy_pointer = NULL;
+
+  // Pushing the argument pointers
+  for (int i = 0; i <= count - 1; i++) {
+    copy_pointer--;
+    char **pointer = (char **) copy_pointer;
+    *pointer = argv[i];
+  }
+
+  // Pushing pointer to first arg
+  char *pointer_copy = (char *) copy_pointer;
+  copy_pointer--;
+  char **pointer = (char **) copy_pointer;
+  *pointer = pointer_copy;
+
+  // Pushing argc
+  copy_pointer --;
+  *((int *)copy_pointer) = count;
+
+  //Pushing return address 0
+  copy_pointer--;
+  //copy_pointer = (void **) stack_pointer;
+  *copy_pointer = NULL;
+  return copy_pointer;
 }
