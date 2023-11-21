@@ -98,17 +98,19 @@ start_process (void *file_name_)
   }
   sema_up(thread_current()->manager->wait_sema);
 
-  int count = 0;
-  int max_len = strlen(token);
-  while (token != NULL) {
-    token = strtok_r(NULL, " ", &save_ptr);
-    count++;
-    //max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
-  }
-  strlcpy(file_copy, file_name, strlen(file_name) + 1);
-  if_.esp = parse_arg(if_.esp, file_copy, count, max_len);
-  //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+  if (success) {
 
+    int count = 0;
+    int max_len = strlen(token);
+    while (token != NULL) {
+      token = strtok_r(NULL, " ", &save_ptr);
+      count++;
+      //max_len = (strlen(token) > max_len) ? strlen(token) : max_len;
+    }
+    strlcpy(file_copy, file_name, strlen(file_name) + 1);
+    if_.esp = parse_arg(if_.esp, file_copy, count, max_len);
+    //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+  }
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
