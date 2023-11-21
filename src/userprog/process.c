@@ -41,15 +41,18 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+  char file_copy[1024];
+  strlcpy(file_copy, file_name, 1024);
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
-
+  strlcpy (fn_copy, file_copy, PGSIZE);
+ 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_copy, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) 
     palloc_free_page (fn_copy);
 
