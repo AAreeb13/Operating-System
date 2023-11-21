@@ -114,30 +114,6 @@ static void **parse_arg(void *esp, char *file_copy, int count, int max_len) {
   return copy_pointer;
 }
 
-
-// void parse_arg0(void **esp, char **file_copy, int count, int max_len) {
-//  char *token, *save_ptr;
-//  char *argv[MAX_ARGS];  // Define a maximum number of arguments (MAX_ARGS)
-//  int argc = 0;
-//
-//// Tokenize the command line and store tokens in argv[]
-//  for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
-//    argv[argc++] = token;
-//    if (argc >= MAX_ARGS) {
-//      // Handle too many arguments error
-//      break;
-//    }
-//  }
-//
-//// Set the last element of argv[] to NULL as a sentinel indicating the end of arguments
-//  argv[argc] = NULL;
-//
-//
-//}
-
-
-
-
 /* A thread function that loads a user process and starts it
    running. */
 static void

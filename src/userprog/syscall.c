@@ -83,6 +83,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   /* Creates a pointer to 32 bit system call number from SP and dereferences it. */
   uint32_t *syscall_number_address = (uint32_t *) f->esp;
+  access_user_mem(syscall_number_address);
   uint32_t syscall_number = *syscall_number_address;
 
   /* Parameter values grabbed for system calls. */
@@ -231,6 +232,7 @@ static int sys_wait(pid_t pid) {
 
 /* Creates a new file named by input with a specified size. */
 static bool sys_create(const char *file, unsigned initial_size) {
+  access_user_mem(file);
   lock_acquire(filesys_lock);
   bool result = filesys_create(file, initial_size);
   lock_release(filesys_lock);
@@ -249,6 +251,7 @@ static bool sys_remove(const char *file) {
 
 /* Opens the file specified. */
 static int sys_open(const char *file) {
+  access_user_mem(file);
   lock_acquire(filesys_lock);
   struct file *f = filesys_open(file);
   lock_release(filesys_lock);
@@ -285,7 +288,7 @@ int sys_filesize(int fd) {
 
 /* Reads "size" bytes from file open as fd into buffer. */
 static int sys_read(int fd, void *buffer, unsigned size) {
-
+  access_user_mem(buffer);
   // Handles reading from keyboard if fd value is 0 or greater than 1.
   if (fd == STDIN_FILENUM) {
     uint8_t *buf = (uint8_t *) buffer;
@@ -293,7 +296,6 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     for (unsigned i = 0; i < size; i++) {
       buf[i] = input_getc();
     }
-
     return size;
   } else if (fd > STDOUT_FILENUM) {
     struct file *file = fd_to_file(fd);
@@ -305,14 +307,13 @@ static int sys_read(int fd, void *buffer, unsigned size) {
       return -1;
     }
   }
-  
   // Handles invalid fd values.
   return -1;
 }
 
 /* Writes to file or console depending on fd value. */
 static int sys_write(int fd, const void *buffer, unsigned size) {
-
+  access_user_mem(buffer);
   // Handles standard output fd value to write to console or anything greater.
   if (fd == STDOUT_FILENUM) {
     const char *charBuffer = (const char *) buffer;
