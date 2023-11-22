@@ -94,14 +94,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   /* Result to be stored within eax register if returning a value if sucess is true; */
   uint32_t result = 0;
-  bool success;
 
   /* Checks if the system call value is within range. */
   if (syscall_number < SYSCALL_MIN || syscall_number > SYSCALL_MAX) {
     sys_exit(-1);
   }
-  
-  // TODO: Use tables to hold functions and args over switch statements and passing args.
 
   /* Switch statement to handle each system call depending on syscall_number value. */
   switch (syscall_number) {
@@ -117,49 +114,41 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_EXEC:
       syscall_args_check(syscall_number_address, 1);
       result = sys_exec((void *) *arg1);
-      success = true;
       break;
 
     case SYS_WAIT:
       syscall_args_check(syscall_number_address, 1);
       result = sys_wait(*arg1);
-      success = true;
       break;
 
     case SYS_CREATE:
       syscall_args_check(syscall_number_address, 2);
       result = sys_create((void *) *arg1, *arg2);
-      success = true;
       break;
 
     case SYS_REMOVE:
       syscall_args_check(syscall_number_address, 1);
       result = sys_remove((void *) *arg1);
-      success = true;
       break;
 
     case SYS_OPEN:
       syscall_args_check(syscall_number_address, 1);
       result = sys_open((void *) *arg1);
-      success = true;
       break;
 
     case SYS_FILESIZE:
       syscall_args_check(syscall_number_address, 1);
       result = sys_filesize(*arg1);
-      success = true;
       break;
 
     case SYS_READ:
       syscall_args_check(syscall_number_address, 3);
       result = sys_read(*arg1, (void *) *arg2, *arg3);
-      success = true;
       break;
 
     case SYS_WRITE:
       syscall_args_check(syscall_number_address, 3);
       result = sys_write(*arg1, (void *) *arg2, *arg3);
-      success = true;
       break;
 
     case SYS_SEEK:
@@ -170,7 +159,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_TELL:
       syscall_args_check(syscall_number_address, 1);
       result = sys_tell(*arg1);
-      success = true;
       break;
 
     case SYS_CLOSE:
@@ -182,13 +170,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_exit(-1);
   }
 
-  /* NULL tells us if result has been modified or not, and therefore whether the eax register 
-     needs to be changed. */
-  if (success) {
-    f->eax = result;
-  } else {
-    return;
-  }
+  f->eax = result;
 }
 
 /* Helper function for syscall_handler() to check if the arguments are valid memory addresses. */
@@ -198,6 +180,7 @@ void syscall_args_check(uint32_t *syscall_num, int args) {
   }
 }
 
+/* Function check if a pointer is safe and valid. */
 static void access_user_mem (const void *uaddr) {
   if (!is_user_vaddr(uaddr) || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
     sys_exit(-1);
@@ -210,6 +193,7 @@ static void sys_halt(void) {
   shutdown_power_off();
 }
 
+/* Terminates current user program. */
 static void sys_exit(int status) {
   thread_current()->manager->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
@@ -226,6 +210,7 @@ static pid_t sys_exec(const char *file) {
   return result;
 }
 
+/* Calls process_wait() to handle parent/child wait functionality. */
 static int sys_wait(pid_t pid) {
   return process_wait(pid);
 };
@@ -257,14 +242,14 @@ static int sys_open(const char *file) {
   struct file *f = filesys_open(file);
   lock_release(filesys_lock);
 
-  // Returns -1 if file does not exist.
+  /* Returns -1 if file does not exist. */
   if (f == NULL) {
     return -1;
   }
 
   struct file_descriptor *fd_elem = malloc(sizeof(struct file_descriptor));
 
-  // Returns -1 if memory could not be allocated for this file (descriptor).
+  /* Returns -1 if memory could not be allocated for this file (descriptor). */
   if (fd_elem == NULL) {
     file_close(f);
     return -1;
@@ -290,7 +275,7 @@ int sys_filesize(int fd) {
 /* Reads "size" bytes from file open as fd into buffer. */
 static int sys_read(int fd, void *buffer, unsigned size) {
   access_user_mem(buffer);
-  // Handles reading from keyboard if fd value is 0 or greater than 1.
+  /* Handles reading from keyboard if fd value is 0 or greater than 1. */
   if (fd == STDIN_FILENUM) {
     uint8_t *buf = (uint8_t *) buffer;
 
@@ -308,18 +293,18 @@ static int sys_read(int fd, void *buffer, unsigned size) {
       return -1;
     }
   }
-  // Handles invalid fd values.
+  /* Handles invalid fd values. */
   return -1;
 }
 
 /* Writes to file or console depending on fd value. */
 static int sys_write(int fd, const void *buffer, unsigned size) {
   access_user_mem(buffer);
-  // Handles standard output fd value to write to console or anything greater.
+ /* Handles standard output fd value to write to console or anything greater. */
   if (fd == STDOUT_FILENUM) {
     const char *charBuffer = (const char *) buffer;
 
-    // Checking buffer is not NULL, if NULL return 0 since no byte was written.
+    /* Checking buffer is not NULL, if NULL return 0 since no byte was written. */
     if (charBuffer == NULL) {
       return 0;
     }
@@ -347,7 +332,7 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
     }
   }
 
-  // Handles invalid fd values.
+  /* Handles invalid fd values. */
   return -1;
 }
 
@@ -355,7 +340,7 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 void sys_seek (int fd, unsigned position) {
   struct file *file = fd_to_file(fd);
 
-  // If the fd value is not valid or the file is NULL, it exits.
+  /* If the fd value is not valid or the file is NULL, it exits. */
   if (file != NULL && fd > STDOUT_FILENUM) {
     file_seek(file, position);
   } else {
@@ -367,14 +352,14 @@ void sys_seek (int fd, unsigned position) {
 static unsigned sys_tell(int fd) {
   struct file *file = fd_to_file(fd);
 
-  // If the fd value is not valid or the file is NULL, it exits.
+  /* If the fd value is not valid or the file is NULL, it exits. */
   if (file != NULL && fd > STDOUT_FILENUM) {
     return file_tell(file);
   } else {
     sys_exit(-1);
   }
 
-  // Should not reach this line, for compiler warning supression.
+  /* Should not reach this line, for compiler warning supression. */
   return -1;
 }
 
@@ -395,16 +380,16 @@ static void sys_close(int fd) {
 
 /* Finds an available fd value by iterating through file_descriptors of thread. */
 int allocate_fd(void) {
-  int fd = 2; // Starts from 2 to avoid conflicts with standard input/output values.
+  int fd = 2; /* Starts from 2 to avoid conflicts with standard input/output values. */
 
   while (fd_to_file_descriptor(fd) != NULL) {
     fd++;
   }
-  
+
   return fd;
 }
 
-/* Grabs the file associated with an fd value from some thread. */
+/* Grabs the file_descriptor struct associated with an fd value from some thread. */
 struct file_descriptor *fd_to_file_descriptor(int fd) {
   struct list_elem *e;
   struct thread *current_thread = thread_current();
@@ -419,9 +404,10 @@ struct file_descriptor *fd_to_file_descriptor(int fd) {
     }
   }
 
-  return NULL; // If the file descriptor is not found, return NULL.
+  return NULL; /* If the file descriptor is not found, return NULL. */
 }
 
+/* Grabs the file associated with an fd value from some thread. */
 struct file *fd_to_file(int fd) {
   struct file_descriptor *file_descriptor = fd_to_file_descriptor(fd);
 
