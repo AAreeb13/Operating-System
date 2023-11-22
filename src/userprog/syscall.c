@@ -339,27 +339,11 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 
     return size;
   } else if (fd > STDOUT_FILENUM) {
-    struct thread *current_thread = thread_current();
-    struct list_elem *e;
-
-    /* String.h was added. This seems obselete. Kept for now.
-    unsigned bufferSize = strlen(buffer) + 1;
-
-    // Checks if size being written is not greater than buffer, otherwise it equates them if so.
-    if (size > bufferSize) {
-      size = bufferSize;
-    }
-    */
   
-    for (e = list_begin(current_thread->file_descriptors); 
-         e != list_end(current_thread->file_descriptors); 
-         e = list_next(e)) {
-      struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
-  
-      if (fd_elem->fd == fd) {
-        int bytes_written = file_write(fd_elem->file, buffer, size);
-        return bytes_written;
-      }
+    struct file *file = fd_to_file(fd);
+    if (file != NULL) {
+      int bytes_written = file_write(file, buffer, size);
+      return bytes_written;
     }
   }
 
@@ -396,45 +380,27 @@ static unsigned sys_tell(int fd) {
 
 /* Closes file descriptor fd. */
 static void sys_close(int fd) {
-  struct thread *current_thread = thread_current();
   struct file *file = fd_to_file(fd);
 
   if (file != NULL && fd > STDOUT_FILENUM) {
     file_close(file);
-    struct list_elem *e;
-
-    for (e = list_begin(current_thread->file_descriptors); 
-         e != list_end(current_thread->file_descriptors); 
-         e = list_next(e)) {
-      struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
-
-      if (fd_elem->fd == fd) {
-        list_remove(e);
-        free(fd_elem);
-        return;
-      }
+    struct file_descriptor *file_descriptor = fd_to_file_descriptor(fd);
+    if (file_descriptor != NULL) {
+      list_remove(&file_descriptor->elem);
+      free(file_descriptor);
+      return;
     }
   }
 }
 
 /* Finds an available fd value by iterating through file_descriptors of thread. */
 int allocate_fd(void) {
-  struct thread *current_thread = thread_current();
   int fd = 2; // Starts from 2 to avoid conflicts with standard input/output values.
-  struct list_elem *e;
 
-  for (e = list_begin(current_thread->file_descriptors); 
-       e != list_end(current_thread->file_descriptors); 
-       e = list_next(e)) {
-    struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
-    
-    if (fd_elem->fd == fd) {
-      // If the fd value is here, it will restart the loop with a higher fd value.
-      fd++;
-      e = list_begin(current_thread->file_descriptors);
-    }
+  while (fd_to_file_descriptor(fd) != NULL) {
+    fd++;
   }
-
+  
   return fd;
 }
 
