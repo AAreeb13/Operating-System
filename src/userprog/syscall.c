@@ -255,21 +255,26 @@ static int sys_open(const char *file) {
     return -1;
   }
 
+  lock_acquire(filesys_lock);
   fd_elem->file = f;
   fd_elem->fd = allocate_fd();
   list_push_back(thread_current()->file_descriptors, &fd_elem->elem);
+  lock_release(filesys_lock);
   return fd_elem->fd;
 }
 
 /* Returns filesize for a specified file descriptor. */
 int sys_filesize(int fd) {
   struct file *file = fd_to_file(fd);
+  int size = -1;
 
   if (file != NULL) {
-    return file_length(file);
-  } else {
-    return -1;
+    lock_acquire(filesys_lock);
+    size = file_length(file);
+    lock_release(filesys_lock);
   }
+  
+  return size;
 }
 
 /* Reads "size" bytes from file open as fd into buffer. */
@@ -284,14 +289,16 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     }
     return size;
   } else if (fd > STDOUT_FILENUM) {
+    lock_acquire(filesys_lock);
+    int bytes_read = -1;
     struct file *file = fd_to_file(fd);
 
     if (file != NULL) {
-      int bytes_read = file_read(file, buffer, size);
-      return bytes_read;
-    } else {
-      return -1;
+      bytes_read = file_read(file, buffer, size);
     }
+
+    lock_release(filesys_lock);
+    return bytes_read;
   }
   /* Handles invalid fd values. */
   return -1;
@@ -324,14 +331,16 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
 
     return size;
   } else if (fd > STDOUT_FILENUM) {
-  
+    lock_acquire(filesys_lock);
     struct file *file = fd_to_file(fd);
+    int bytes_written = -1;
+
     if (file != NULL) {
-      lock_acquire(filesys_lock);
-      int bytes_written = file_write(file, buffer, size);
-      lock_release(filesys_lock);
-      return bytes_written;
+      bytes_written = file_write(file, buffer, size);
     }
+
+    lock_release(filesys_lock);
+    return bytes_written;
   }
 
   /* Handles invalid fd values. */
@@ -355,18 +364,20 @@ void sys_seek (int fd, unsigned position) {
 /* Returns the poisiton of the next byte to be written for fd. */
 static unsigned sys_tell(int fd) {
   struct file *file = fd_to_file(fd);
+  unsigned position = -1;
 
   /* If the fd value is not valid or the file is NULL, it exits. */
   if (file != NULL && fd > STDOUT_FILENUM) {
     lock_acquire(filesys_lock);
-    return file_tell(file);
+    position = file_tell(file);
     lock_release(filesys_lock);
+    return position;
   } else {
     sys_exit(-1);
   }
 
   /* Should not reach this line, for compiler warning supression. */
-  return -1;
+  return position;
 }
 
 /* Closes file descriptor fd. */
@@ -376,9 +387,12 @@ static void sys_close(int fd) {
   if (file != NULL && fd > STDOUT_FILENUM) {
     file_close(file);
     struct file_descriptor *file_descriptor = fd_to_file_descriptor(fd);
+    
     if (file_descriptor != NULL) {
+      lock_acquire(filesys_lock);
       list_remove(&file_descriptor->elem);
       free(file_descriptor);
+      lock_release(filesys_lock);
       return;
     }
   }
