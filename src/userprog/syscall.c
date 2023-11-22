@@ -439,7 +439,7 @@ int allocate_fd(void) {
 }
 
 /* Grabs the file associated with an fd value from some thread. */
-struct file *fd_to_file(int fd) {
+struct file_descriptor *fd_to_file_descriptor(int fd) {
   struct list_elem *e;
   struct thread *current_thread = thread_current();
 
@@ -449,9 +449,19 @@ struct file *fd_to_file(int fd) {
     struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
 
     if (fd_elem->fd == fd) {
-      return fd_elem->file;
+      return fd_elem;
     }
   }
 
   return NULL; // If the file descriptor is not found, return NULL.
+}
+
+struct file *fd_to_file(int fd) {
+  struct file_descriptor *file_descriptor = fd_to_file_descriptor(fd);
+
+  if (file_descriptor == NULL) {
+    return NULL;
+  } else {
+    return file_descriptor->file;
+  }
 }

@@ -12,6 +12,7 @@ void syscall_args_check(uint32_t *, int);
 
 /* File descriptor helper functions. */
 int allocate_fd(void);
+struct file_descriptor *fd_to_file_descriptor(int);
 struct file *fd_to_file(int);
 
 #endif /* userprog/syscall.h */
