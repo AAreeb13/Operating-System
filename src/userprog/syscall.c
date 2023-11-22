@@ -287,9 +287,7 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     struct file *file = fd_to_file(fd);
 
     if (file != NULL) {
-      lock_acquire(filesys_lock);
       int bytes_read = file_read(file, buffer, size);
-      lock_release(filesys_lock);
       return bytes_read;
     } else {
       return -1;
