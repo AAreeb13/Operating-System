@@ -220,38 +220,37 @@ thread_create (const char *name, int priority,
 
 #ifdef USERPROG
   if (strcmp(name, "idle") != 0) {
-  /* Initialises file descriptors list. */
-  struct list *fd_list = (struct list *) malloc(sizeof(struct list));
+    /* Initialises file descriptors list. */
+    struct list *fd_list = (struct list *) malloc(sizeof(struct list));
 
-  struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
-  struct list *managers = (struct list *) malloc(sizeof(struct list));
-  struct semaphore *sema = (struct semaphore *) malloc(sizeof(struct semaphore));
-  struct lock *lock = (struct lock *) malloc(sizeof(struct lock));
+    struct manager *manager = (struct manager *) malloc(sizeof(struct manager));
+    struct list *managers = (struct list *) malloc(sizeof(struct list));
+    struct semaphore *sema = (struct semaphore *) malloc(sizeof(struct semaphore));
+    struct lock *lock = (struct lock *) malloc(sizeof(struct lock));
 
-  if (manager == NULL || managers == NULL || sema == NULL || lock == NULL || fd_list == NULL) {
-    free(manager);
-    free(managers);
-    free(sema);
-    free(lock);
-    free(fd_list);
-  }
+    if (manager == NULL || managers == NULL || sema == NULL || lock == NULL || fd_list == NULL) {
+      free(manager);
+      free(managers);
+      free(sema);
+      free(lock);
+      free(fd_list);
+    }
 
-  list_init(managers);
-  sema_init(sema, 0);
-  lock_init(lock);
-  list_init(fd_list);
+    list_init(managers);
+    sema_init(sema, 0);
+    lock_init(lock);
+    list_init(fd_list);
 
-  t->manager = manager;
-  t->managers = managers;
-  manager->wait_sema = sema;
-  manager->rw_lock = lock;
-  manager->parent_dead = false;
-  t->exit_status = THREAD_ALIVE;
-  manager->exit_status = THREAD_ALIVE;
-  manager->load_status = false;
-  manager->child_pid = tid;
-  list_push_back(thread_current()->managers, &manager->elem);
-  t->file_descriptors = fd_list;
+    t->manager = manager;
+    t->managers = managers;
+    manager->wait_sema = sema;
+    manager->rw_lock = lock;
+    manager->parent_dead = false;
+    manager->exit_status = THREAD_ALIVE;
+    manager->load_status = false;
+    manager->child_pid = tid;
+    list_push_back(thread_current()->managers, &manager->elem);
+    t->file_descriptors = fd_list;
   }
 #endif
 

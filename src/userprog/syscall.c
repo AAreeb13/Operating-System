@@ -211,7 +211,7 @@ static void sys_halt(void) {
 }
 
 static void sys_exit(int status) {
-  thread_current()->exit_status = status;
+  thread_current()->manager->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
