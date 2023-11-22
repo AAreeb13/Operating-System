@@ -287,7 +287,9 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     struct file *file = fd_to_file(fd);
 
     if (file != NULL) {
+      lock_acquire(filesys_lock);
       int bytes_read = file_read(file, buffer, size);
+      lock_release(filesys_lock);
       return bytes_read;
     } else {
       return -1;
@@ -327,7 +329,9 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
   
     struct file *file = fd_to_file(fd);
     if (file != NULL) {
+      lock_acquire(filesys_lock);
       int bytes_written = file_write(file, buffer, size);
+      lock_release(filesys_lock);
       return bytes_written;
     }
   }
@@ -342,7 +346,9 @@ void sys_seek (int fd, unsigned position) {
 
   /* If the fd value is not valid or the file is NULL, it exits. */
   if (file != NULL && fd > STDOUT_FILENUM) {
+    lock_acquire(filesys_lock);
     file_seek(file, position);
+    lock_release(filesys_lock);
   } else {
     sys_exit(-1);
   }
@@ -354,7 +360,9 @@ static unsigned sys_tell(int fd) {
 
   /* If the fd value is not valid or the file is NULL, it exits. */
   if (file != NULL && fd > STDOUT_FILENUM) {
+    lock_acquire(filesys_lock);
     return file_tell(file);
+    lock_release(filesys_lock);
   } else {
     sys_exit(-1);
   }
