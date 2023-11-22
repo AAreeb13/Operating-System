@@ -110,13 +110,13 @@ start_process (void *file_name_)
       count++;
     }
     if (count >= 500) {
-      thread_current()->exit_status = -1;
+      thread_current()->manager->exit_status = -1;
       palloc_free_page (file_name);
       thread_exit();
     }
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
     if (parse_arg(&if_, file_copy, count) == -1) {
-      thread_current()->exit_status = -1;
+      thread_current()->manager->exit_status = -1;
       palloc_free_page (file_name);
       thread_exit();
     }
