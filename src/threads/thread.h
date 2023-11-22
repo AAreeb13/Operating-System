@@ -104,7 +104,6 @@ struct thread
     struct list *file_descriptors;      /* List of file descriptors. */
     struct list *managers;              /* List of child processes */
     struct manager *manager;            /* Element of parent's managers list */
-    int exit_status;
     struct file *executable;            /* Executable file associated with thread. */
 #endif
 

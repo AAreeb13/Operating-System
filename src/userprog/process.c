@@ -582,10 +582,8 @@ static void child_exit(struct manager *manager) {
   if (manager->parent_dead) {
     free_manager(manager);
   } else {
-    if (thread_current()->exit_status == THREAD_ALIVE) {
+    if (thread_current()->manager->exit_status == THREAD_ALIVE) {
       manager->exit_status = THREAD_EXIT;
-    } else {
-      manager->exit_status = thread_current()->exit_status;
     }
     sema_up(manager->wait_sema);
     lock_release(manager->rw_lock);
@@ -618,7 +616,7 @@ static void free_manager(struct manager *manager) {
   free(manager->wait_sema);
   free(manager);
 }
-
+//
 /* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
  * Takes in interrupt frame, token and save_ptr to setup user stack
  * What it needs to do:
