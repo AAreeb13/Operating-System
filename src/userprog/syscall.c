@@ -325,12 +325,17 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
     }
 
     /* Handles sizes that are greater than 400 bytes and breaks it down. */
-    if (size > 400) {
-      return sys_write(fd, buffer, 400) + sys_write(fd, buffer + 400, size - 400);
+    int sizeCount = size;
+    while (sizeCount != 0) {
+      if (sizeCount < 400) {
+        putbuf(charBuffer, sizeCount);
+        sizeCount = 0;
+      } else {
+        putbuf(charBuffer, 400);
+        sizeCount -= 400;
+        charBuffer += 400;
+      }
     }
-
-    // Write to console using putbuf.
-    putbuf(charBuffer, size);
 
     return size;
   } else if (fd > STDOUT_FILENUM) {
