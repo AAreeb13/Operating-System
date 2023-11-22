@@ -212,13 +212,12 @@ static void sys_halt(void) {
 
 static void sys_exit(int status) {
   thread_current()->exit_status = status;
-  printf("%s: exit(%d)\n", thread_current()->name,status);
+  printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
 
 /* Runs the executable given. */
 static pid_t sys_exec(const char *file) {
-  /* TODO: check return value of load. */
   access_user_mem(file);
   lock_acquire(filesys_lock);
   int result = process_execute(file);

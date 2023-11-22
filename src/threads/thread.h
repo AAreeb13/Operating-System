@@ -25,10 +25,10 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-//#ifdef USERPROG
-//#define THREAD_ALIVE -2                 /* Default value at execution */
-//#define KERNEL_THREAD_EXIT -1           /* For when a thread dies via thread_exit() instead of sys_exit() */
-//#endif USERPROG
+#ifdef USERPROG
+#define THREAD_ALIVE -2                 /* Default exit_status when thread created. */
+#define THREAD_EXIT -1                  /* exit_status when a thread dies via thread_exit() instead of sys_exit(). */
+#endif
 
 /* A kernel thread or user process.
 
@@ -100,13 +100,12 @@ struct thread
     struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
-    /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct list *file_descriptors;       /* List of file descriptors. */
-    struct list *managers;
-    struct manager *manager;
+    struct list *file_descriptors;      /* List of file descriptors. */
+    struct list *managers;              /* List of child processes */
+    struct manager *manager;            /* Element of parent's managers list */
     int exit_status;
-    struct file *executable;    /* Executable file associated with thread. */
+    struct file *executable;            /* Executable file associated with thread. */
 #endif
 
     /* Owned by thread.c. */
@@ -122,8 +121,8 @@ struct file_descriptor {
 
 struct manager {
   tid_t child_pid;
-  int exit_status;                      /* Child processes will write their exit_status. */
-  int load_status;
+  int exit_status;                      /* Where child processes will write their exit_status. */
+  bool load_status;                     /* Default false. True if load() returns true. */
   bool parent_dead;
   struct semaphore *wait_sema;          /* For making parent wait. */
   struct lock *rw_lock;                 /* For reading and writing. */

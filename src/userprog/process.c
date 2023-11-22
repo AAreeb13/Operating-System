@@ -58,14 +58,15 @@ process_execute (const char *file_name)
 
   struct list *managers = thread_current()->managers;
   struct manager *manager; struct list_elem *e;
+  bool load_status = false;
   for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == tid) {
       sema_down(manager->wait_sema);
-      return manager->load_status == 1 ? tid : TID_ERROR;
+      load_status = manager->load_status;
     }
   }
-  return tid;
+  return load_status ? tid : TID_ERROR;
 }
 
 /* A thread function that loads a user process and starts it
@@ -89,10 +90,12 @@ start_process (void *file_name_)
   token = strtok_r(file_copy, " ", &save_ptr);
   strlcpy(thread_current()->name, token, sizeof thread_current()->name);
   success = load (token, &if_.eip, &if_.esp);
+  thread_current()->manager->load_status = success;
+  sema_up(thread_current()->manager->wait_sema);
 
   // Deny writes to the executable file.
   if (success) {
-    thread_current()->manager->load_status = 1;
+//    thread_current()->manager->load_status = LOAD_SUCCESS;
     thread_current()->executable = filesys_open(token);
     file_deny_write(thread_current()->executable);
 
@@ -104,10 +107,7 @@ start_process (void *file_name_)
     }
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
     if_.esp = parse_arg(if_.esp, file_copy, count);
-  } else {
-    thread_current()->manager->load_status = -1;
   }
-  sema_up(thread_current()->manager->wait_sema);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -149,6 +149,7 @@ process_wait (tid_t child_tid)
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
       sema_down(manager->wait_sema);
+      lock_acquire(manager->rw_lock);
       int exit_status = manager->exit_status;
       list_remove(&manager->elem);
       free_manager(manager);
@@ -581,8 +582,8 @@ static void child_exit(struct manager *manager) {
   if (manager->parent_dead) {
     free_manager(manager);
   } else {
-    if (thread_current()->exit_status == -2) {
-      manager->exit_status = -1;
+    if (thread_current()->exit_status == THREAD_ALIVE) {
+      manager->exit_status = THREAD_EXIT;
     } else {
       manager->exit_status = thread_current()->exit_status;
     }
@@ -600,7 +601,7 @@ static void parent_exit(struct list *managers) {
     manager = list_entry(e, struct manager, elem);
     lock_acquire(manager->rw_lock);
 
-    if (manager->exit_status == -2) {
+    if (manager->exit_status == THREAD_ALIVE) {
       manager->parent_dead = true;
       e = list_next(e);
       lock_release(manager->rw_lock);
