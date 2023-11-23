@@ -234,6 +234,8 @@ thread_create (const char *name, int priority,
       free(sema);
       free(lock);
       free(fd_list);
+      palloc_free_page(t);
+      return TID_ERROR;
     }
 
     list_init(managers);
