@@ -97,8 +97,8 @@ start_process (void *file_name_)
   thread_current()->manager->load_status = success;
   sema_up(thread_current()->manager->wait_sema);
 
-  /* Deny writes to the executable file. */
   if (success) {
+    /* Deny writes to the executable file. */
     lock_acquire(filesys_lock);
     thread_current()->executable = filesys_open(token);
     file_deny_write(thread_current()->executable);
@@ -182,6 +182,7 @@ process_exit (void)
   struct manager *manager = cur->manager;
   struct list *managers = cur->managers;
 
+  /* Allow writes to the executable file. */
   if (cur->executable != NULL) {
     file_allow_write(cur->executable);
     file_close(cur->executable);
