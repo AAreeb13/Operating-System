@@ -33,32 +33,20 @@ const int STDOUT_FILENUM = 1;
 const int SYSCALL_MAX = 12;
 const int SYSCALL_MIN = 0;
 
-/* System call type definition. */
-typedef void syscall(struct intr_frame *f);
-
-/* Function declarations for system calls. */
-static syscall sys_halt;
-static syscall sys_exit;
-static syscall sys_exec;
-static syscall sys_wait;
-static syscall sys_create;
-static syscall sys_remove;
-static syscall sys_open;
-static syscall sys_filesize;
-static syscall sys_read;
-static syscall sys_write;
-static syscall sys_seek;
-static syscall sys_tell;
-static syscall sys_close;
-
-/* Lock for the file system. */
-static struct lock *filesys_lock;
-
-/* Function pointer table for system calls, indexed in order of and by their system call numbers. */
-static void (*system_calls[]) (struct intr_frame *) = {
-  sys_halt, sys_exit, sys_exec, sys_wait, sys_create, sys_remove,
-  sys_open, sys_filesize, sys_read, sys_write, sys_seek, sys_tell, sys_close
-};
+/* System call functions. */
+static void sys_halt(void);
+static void sys_exit(int);
+static pid_t sys_exec(const char *);
+static int sys_wait(pid_t);
+static bool sys_create(const char *, unsigned);
+static bool sys_remove(const char *);
+static int sys_open(const char *);
+static int sys_filesize(int);
+static int sys_read(int, void *, unsigned);
+static int sys_write(int, const void *, unsigned);
+static void sys_seek(int, unsigned);
+static unsigned sys_tell(int);
+static void sys_close(int);
 
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
@@ -143,7 +131,6 @@ static void sys_exit(struct intr_frame *f) {
 /* Helper for sys_exit() to support 'int status' variable yet mantain syscall modularity. */
 static void exit(int status) {
   thread_current()->manager->exit_status = status;
-  printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
 
