@@ -28,6 +28,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 static void child_exit(struct manager *);
 static void parent_exit(struct list *);
+static void free_fds(struct list *);
 
 static void free_manager(struct manager *);
 
@@ -195,17 +196,7 @@ process_exit (void)
   }
 
   if (cur->file_descriptors != NULL) {
-    struct list *fds = cur->file_descriptors;
-    struct list_elem *e = list_begin(fds);
-    struct file_descriptor *fd;
-    
-    while (e != list_end(fds)) {
-      fd = list_entry(e, struct file_descriptor, elem);
-      file_close(fd->file);
-      list_remove(e);
-      e = list_next(e);
-      free(fd);
-    }
+    free_fds(cur->file_descriptors);
   }
 
   /* Destroy the current process's page directory and switch back
@@ -626,6 +617,20 @@ static void free_manager(struct manager *manager) {
   free(manager->rw_lock);
   free(manager->wait_sema);
   free(manager);
+}
+
+/* Frees file descriptors associated with list. */
+void free_fds(struct list *fds) {
+  struct list_elem *e = list_begin(fds);
+  struct file_descriptor *fd;
+    
+  while (e != list_end(fds)) {
+    fd = list_entry(e, struct file_descriptor, elem);
+    file_close(fd->file);
+    list_remove(e);
+    e = list_next(e);
+    free(fd);
+  }
 }
 
 /* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
