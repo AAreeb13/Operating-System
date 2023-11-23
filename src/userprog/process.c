@@ -32,7 +32,7 @@ static void parent_exit(struct list *);
 static void free_manager(struct manager *);
 
 static int load_and_process(char *, struct intr_frame *);
-static int parse_arg(struct intr_frame *, char *, int);
+static void parse_arg(struct intr_frame *, char *, int);
 
 /* Starts a new thread running a user program loaded from
    FILENAME. The new thread may be scheduled (and may even exit)
@@ -74,49 +74,6 @@ process_execute (const char *file_name)
   return load_status ? tid : TID_ERROR;
 }
 
-/* Loads the executable, denies write to executable and sets up user stack */
-static int load_and_process(char *file_name, struct intr_frame *if_) {
-  bool success;
-  char *token, *save_ptr;
-  char file_copy[strlen(file_name) + 1];
-
-  /* Load executable and wakes up parent so it can read load_status */
-  strlcpy(file_copy, file_name, strlen(file_name) + 1);
-  token = strtok_r(file_copy, " ", &save_ptr);
-  strlcpy(thread_current()->name, token, sizeof thread_current()->name);
-  success = load (token, &(if_->eip), &(if_->esp));
-  thread_current()->manager->load_status = success;
-  sema_up(thread_current()->manager->wait_sema);
-
-  /* Deny writes to the executable file. */
-  if (success) {
-    lock_acquire(filesys_lock);
-    thread_current()->executable = filesys_open(token);
-    file_deny_write(thread_current()->executable);
-    lock_release(filesys_lock);
-
-    /* Counts number of arguments to check for stackoverflow */
-    int count = 0;
-    while (token != NULL) {
-      token = strtok_r(NULL, " ", &save_ptr);
-      count++;
-    }
-    if (count >= MAX_POINTER_ARRAY_SIZE) {
-      return -1;
-    }
-
-    /* Sets up user stack and checks if it failed */
-    strlcpy(file_copy, file_name, strlen(file_name) + 1);
-    parse_arg(if_, file_copy, count);
-//    if (parse_arg(if_, file_copy, count) == -1) {
-//      return -1;
-//    }
-  } else {
-    return -1;
-  }
-
-  return 1;
-}
 
 /* A thread function that loads a user process and starts it
    running. */
@@ -125,7 +82,6 @@ start_process (void *file_name_)
 {
   char *file_name = file_name_;
   struct intr_frame if_;
-//  bool success;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -133,52 +89,13 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  // result = -1 means something went wrong
+  /* Loads executable, denies write and sets up stack */
   int result = load_and_process(file_name, &if_);
   palloc_free_page (file_name);
+  /* result equals -1 if any of the processes did not work */
   if (result == -1) {
     thread_exit();
   }
-//  /* Tokenizes file_name and puts program name into load */
-//  char *token, *save_ptr;
-//  char file_copy[strlen(file_name) + 1];
-//  strlcpy(file_copy, file_name, strlen(file_name) + 1);
-//  token = strtok_r(file_copy, " ", &save_ptr);
-//  strlcpy(thread_current()->name, token, sizeof thread_current()->name);
-//  success = load (token, &if_.eip, &if_.esp);
-//  thread_current()->manager->load_status = success;
-//  sema_up(thread_current()->manager->wait_sema);
-//
-//  /* Deny writes to the executable file. */
-//  if (success) {
-//    lock_acquire(filesys_lock);
-//    thread_current()->executable = filesys_open(token);
-//    file_deny_write(thread_current()->executable);
-//    lock_release(filesys_lock);
-//
-//    /* Counts number of arguments to check for stackoverflow */
-//    int count = 0;
-//    while (token != NULL) {
-//      token = strtok_r(NULL, " ", &save_ptr);
-//      count++;
-//    }
-//    if (count >= MAX_POINTER_ARRAY_SIZE) {
-//      palloc_free_page (file_name);
-//      thread_exit();
-//    }
-//
-//    /* Sets up user stack */
-//    strlcpy(file_copy, file_name, strlen(file_name) + 1);
-//    if (parse_arg(&if_, file_copy, count) == -1) {
-//      palloc_free_page (file_name);
-//      thread_exit();
-//    }
-//  }
-//
-//  /* If load failed, quit. */
-//  palloc_free_page (file_name);
-//  if (!success)
-//    thread_exit ();
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -229,6 +146,7 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
+
   struct thread *cur = thread_current ();
   uint32_t *pd;
   struct manager *manager = cur->manager;
@@ -238,11 +156,11 @@ process_exit (void)
     file_allow_write(cur->executable);
     file_close(cur->executable);
   }
-
+  /* The current process writes its exit status for its parent. */
   if (manager != NULL) {
     child_exit(manager);
   }
-
+  /* The current process frees the struct list and the managers of dead children. */
   if (managers != NULL) {
     parent_exit(managers);
   }
@@ -681,18 +599,51 @@ static void free_manager(struct manager *manager) {
   free(manager);
 }
 
-/* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
- * Takes in interrupt frame, token and save_ptr to setup user stack
- * What it needs to do:
- * Put arguments in reverse order
- * Remember the pointer to the arguments so that you can put them in later on
- * Put 0 after putting the actual arguments
- * You can go through the tokens once and then again, first time to get num of elements
- *
- * */
+/* Loads the executable, denies write to executable and sets up user stack */
+static int load_and_process(char *file_name, struct intr_frame *if_) {
+  bool success;
+  char *token, *save_ptr;
+  char file_copy[strlen(file_name) + 1];
+
+  /* Load executable and wakes up parent so it can read load_status */
+  strlcpy(file_copy, file_name, strlen(file_name) + 1);
+  token = strtok_r(file_copy, " ", &save_ptr);
+  strlcpy(thread_current()->name, token, sizeof thread_current()->name);
+  success = load (token, &(if_->eip), &(if_->esp));
+  thread_current()->manager->load_status = success;
+  sema_up(thread_current()->manager->wait_sema);
+
+  /* Deny writes to the executable file. */
+  if (success) {
+    lock_acquire(filesys_lock);
+    thread_current()->executable = filesys_open(token);
+    file_deny_write(thread_current()->executable);
+    lock_release(filesys_lock);
+
+    /* Counts number of arguments to check for stackoverflow */
+    int count = 0;
+    while (token != NULL) {
+      token = strtok_r(NULL, " ", &save_ptr);
+      count++;
+    }
+    if (count >= MAX_POINTER_ARRAY_SIZE) {
+      return -1;
+    }
+
+    /* Sets up user stack and checks if it failed */
+    strlcpy(file_copy, file_name, strlen(file_name) + 1);
+    parse_arg(if_, file_copy, count);
+  } else {
+    return -1;
+  }
+
+  return 1;
+}
+
+/* Sets up user stack and sets stack pointer to return address */
 
 
-static int parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
+static void parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
   char *token, *save_ptr;
   char *char_pointer = (char *) intrFrame->esp;
   int counter = count - 1;
@@ -708,11 +659,6 @@ static int parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
     argv[counter] = char_pointer;
     counter--;
   }
-
-//  /* Check for stack overflow */
-//  if (char_pointer - 4*(count) < 10) {
-//    return -1;
-//  }
 
   /* Push Null pointer sentinel */
   void **void_star_pointer = (void **) char_pointer;
@@ -742,5 +688,4 @@ static int parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
   *void_star_pointer = NULL;
 
   intrFrame->esp = void_star_pointer;
-  return 1;
 }
