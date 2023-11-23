@@ -29,7 +29,7 @@ static void parent_exit(struct list *);
 
 static void free_manager(struct manager *);
 
-static void **parse_arg(void *, char *, int);
+static int parse_arg(struct intr_frame *, char *, int);
 
 /* Starts a new thread running a user program loaded from
    FILENAME. The new thread may be scheduled (and may even exit)
@@ -38,21 +38,25 @@ static void **parse_arg(void *, char *, int);
 tid_t
 process_execute (const char *file_name) 
 {
+  /* Restricts the cmd line to less than 4KB to prevent stack overflow*/
+  if (strlen(file_name) > 4090) {
+    return TID_ERROR;
+  }
   char *fn_copy;
   tid_t tid;
 
-  char file_copy[1024];
-  strlcpy(file_copy, file_name, 1024);
+//  char file_copy[1024];
+//  strlcpy(file_copy, file_name, 1024);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_copy, PGSIZE);
+  strlcpy (fn_copy, file_name, PGSIZE);
  
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_copy, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) 
     palloc_free_page (fn_copy);
 
@@ -104,8 +108,17 @@ start_process (void *file_name_)
       token = strtok_r(NULL, " ", &save_ptr);
       count++;
     }
+    if (count >= 500) {
+      thread_current()->manager->exit_status = -1;
+      palloc_free_page (file_name);
+      thread_exit();
+    }
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
-    if_.esp = parse_arg(if_.esp, file_copy, count);
+    if (parse_arg(&if_, file_copy, count) == -1) {
+      thread_current()->manager->exit_status = -1;
+      palloc_free_page (file_name);
+      thread_exit();
+    }
   }
 
   /* If load failed, quit. */
@@ -627,9 +640,9 @@ static void free_manager(struct manager *manager) {
  * */
 
 
-static void **parse_arg(void *esp, char *file_copy, int count) {
+static int parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
   char *token, *save_ptr;
-  char *char_pointer = (char *) esp;
+  char *char_pointer = (char *) intrFrame->esp;
   int counter = count - 1;
   char *argv[count];
 
@@ -642,6 +655,11 @@ static void **parse_arg(void *esp, char *file_copy, int count) {
     strlcpy(char_pointer, token, len);
     argv[counter] = char_pointer;
     counter--;
+  }
+
+  /* Check for stack overflow */
+  if (char_pointer - 4*(count) < 10) {
+    return -1;
   }
 
   /* Push Null pointer sentinel */
@@ -671,5 +689,6 @@ static void **parse_arg(void *esp, char *file_copy, int count) {
   void_star_pointer--;
   *void_star_pointer = NULL;
 
-  return void_star_pointer;
+  intrFrame->esp = void_star_pointer;
+  return 1;
 }
