@@ -45,9 +45,6 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-//  char file_copy[1024];
-//  strlcpy(file_copy, file_name, 1024);
-
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -97,7 +94,7 @@ start_process (void *file_name_)
   thread_current()->manager->load_status = success;
   sema_up(thread_current()->manager->wait_sema);
 
-  // Deny writes to the executable file.
+  /* Deny writes to the executable file. */
   if (success) {
     lock_acquire(filesys_lock);
     thread_current()->executable = filesys_open(token);
