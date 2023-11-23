@@ -149,7 +149,7 @@ process_wait (tid_t child_tid)
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
       sema_down(manager->wait_sema);
-      lock_acquire(manager->rw_lock);
+      //lock_acquire(manager->rw_lock);
       int exit_status = manager->exit_status;
       list_remove(&manager->elem);
       free_manager(manager);
@@ -578,13 +578,13 @@ install_page (void *upage, void *kpage, bool writable)
 /* Child process writes its exit_status and frees manager if parent is dead. */
 static void child_exit(struct manager *manager) {
   lock_acquire(manager->rw_lock);
-
+  if (manager->exit_status == THREAD_ALIVE) {
+    manager->exit_status = THREAD_EXIT;
+  }
+  printf("%s: exit(%d)\n", thread_current()->name, manager->exit_status);
   if (manager->parent_dead) {
     free_manager(manager);
   } else {
-    if (thread_current()->manager->exit_status == THREAD_ALIVE) {
-      manager->exit_status = THREAD_EXIT;
-    }
     sema_up(manager->wait_sema);
     lock_release(manager->rw_lock);
   }
