@@ -99,8 +99,10 @@ start_process (void *file_name_)
 
   // Deny writes to the executable file.
   if (success) {
+    lock_acquire(filesys_lock);
     thread_current()->executable = filesys_open(token);
     file_deny_write(thread_current()->executable);
+    lock_release(filesys_lock);
 
     /* Counts number of arguments and sets up stack */
     int count = 0;
@@ -161,7 +163,7 @@ process_wait (tid_t child_tid)
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
       sema_down(manager->wait_sema);
-      //lock_acquire(manager->rw_lock);
+      lock_acquire(manager->rw_lock);
       int exit_status = manager->exit_status;
       list_remove(&manager->elem);
       free_manager(manager);

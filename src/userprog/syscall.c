@@ -39,8 +39,6 @@ static void sys_seek(int, unsigned);
 static unsigned sys_tell(int);
 static void sys_close(int);
 
-static struct lock *filesys_lock;
-
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
 Writing past end-of-file would normally extend the file, but file growth is not implemented
