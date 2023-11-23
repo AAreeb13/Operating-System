@@ -14,32 +14,51 @@
 #include "lib/string.h"
 
 static void syscall_handler (struct intr_frame *);
-static void access_user_mem (const void *);
+
+/* Helper functions for system calls. */
+static void access_user_mem(const void *);
+uint32_t *get_arg (struct intr_frame *, int);
+static void exit(int);
+
+/* File descriptor helper functions. */
+static int allocate_fd(void);
+static struct file_descriptor *fd_to_file_descriptor(int);
+static struct file *fd_to_file(int);
 
 /* Standard input and output fd values respectively. */
 const int STDIN_FILENUM = 0;
 const int STDOUT_FILENUM = 1;
 
-/* Max and min number value for system calls. */
-const int SYSCALL_MAX = 19;
+/* Maximum and minimum number values for system calls (implemented). */
+const int SYSCALL_MAX = 12;
 const int SYSCALL_MIN = 0;
 
-/* System call functions. */
-static void sys_halt(void);
-static void sys_exit(int);
-static pid_t sys_exec(const char *);
-static int sys_wait(pid_t);
-static bool sys_create(const char *, unsigned);
-static bool sys_remove(const char *);
-static int sys_open(const char *);
-static int sys_filesize(int);
-static int sys_read(int, void *, unsigned);
-static int sys_write(int, const void *, unsigned);
-static void sys_seek(int, unsigned);
-static unsigned sys_tell(int);
-static void sys_close(int);
+/* System call type definition. */
+typedef void syscall(struct intr_frame *f);
 
+/* Function declarations for system calls. */
+static syscall sys_halt;
+static syscall sys_exit;
+static syscall sys_exec;
+static syscall sys_wait;
+static syscall sys_create;
+static syscall sys_remove;
+static syscall sys_open;
+static syscall sys_filesize;
+static syscall sys_read;
+static syscall sys_write;
+static syscall sys_seek;
+static syscall sys_tell;
+static syscall sys_close;
+
+/* Lock for the file system. */
 static struct lock *filesys_lock;
+
+/* Function pointer table for system calls, indexed in order of and by their system call numbers. */
+static void (*system_calls[]) (struct intr_frame *) = {
+  sys_halt, sys_exit, sys_exec, sys_wait, sys_create, sys_remove,
+  sys_open, sys_filesize, sys_read, sys_write, sys_seek, sys_tell, sys_close
+};
 
 /* Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
 written, which may be less than size if some bytes could not be written.
@@ -81,190 +100,135 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  /* Creates a pointer to 32 bit system call number from SP and dereferences it. */
-  uint32_t *syscall_number_address = (uint32_t *) f->esp;
+  uint32_t *syscall_number_address = get_arg(f, 0);
   access_user_mem(syscall_number_address);
-  
+
   uint32_t syscall_number = *syscall_number_address;
-
-  /* Parameter values grabbed for system calls. */
-  uint32_t *arg1 = syscall_number_address + 1;
-  uint32_t *arg2 = syscall_number_address + 2;
-  uint32_t *arg3 = syscall_number_address + 3;
-
-  /* Result to be stored within eax register if returning a value if sucess is true; */
-  uint32_t result = 0;
 
   /* Checks if the system call value is within range. */
   if (syscall_number < SYSCALL_MIN || syscall_number > SYSCALL_MAX) {
-    sys_exit(-1);
+    exit(-1);
   }
 
-  /* Switch statement to handle each system call depending on syscall_number value. */
-  switch (syscall_number) {
-    case SYS_HALT:
-      sys_halt();
-      break;
-
-    case SYS_EXIT:
-      syscall_args_check(syscall_number_address, 1);
-      sys_exit(*arg1);
-      break;
-
-    case SYS_EXEC:
-      syscall_args_check(syscall_number_address, 1);
-      result = sys_exec((void *) *arg1);
-      break;
-
-    case SYS_WAIT:
-      syscall_args_check(syscall_number_address, 1);
-      result = sys_wait(*arg1);
-      break;
-
-    case SYS_CREATE:
-      syscall_args_check(syscall_number_address, 2);
-      result = sys_create((void *) *arg1, *arg2);
-      break;
-
-    case SYS_REMOVE:
-      syscall_args_check(syscall_number_address, 1);
-      result = sys_remove((void *) *arg1);
-      break;
-
-    case SYS_OPEN:
-      syscall_args_check(syscall_number_address, 1);
-      result = sys_open((void *) *arg1);
-      break;
-
-    case SYS_FILESIZE:
-      syscall_args_check(syscall_number_address, 1);
-      result = sys_filesize(*arg1);
-      break;
-
-    case SYS_READ:
-      syscall_args_check(syscall_number_address, 3);
-      result = sys_read(*arg1, (void *) *arg2, *arg3);
-      break;
-
-    case SYS_WRITE:
-      syscall_args_check(syscall_number_address, 3);
-      result = sys_write(*arg1, (void *) *arg2, *arg3);
-      break;
-
-    case SYS_SEEK:
-      syscall_args_check(syscall_number_address, 2);
-      sys_seek(*arg1, *arg2);
-      break;
-
-    case SYS_TELL:
-      syscall_args_check(syscall_number_address, 1);
-      result = sys_tell(*arg1);
-      break;
-
-    case SYS_CLOSE:
-      syscall_args_check(syscall_number_address, 1);
-      sys_close(*arg1);
-      break;
-
-    default:
-      sys_exit(-1);
-  }
-
-  f->eax = result;
+  system_calls[syscall_number](f);
 }
 
-/* Helper function for syscall_handler() to check if the arguments are valid memory addresses. */
-void syscall_args_check(uint32_t *syscall_num, int args) {
-  for (int i = 1; i <= args; i++) {
-    access_user_mem (syscall_num + i);
-  }
+/* Grabs an argument i from stack correctly and returns it. */
+uint32_t *get_arg (struct intr_frame *f, int i) {
+  uint32_t *syscall_number_address = (uint32_t *) f->esp;
+  uint32_t *arg = syscall_number_address + i;
+  access_user_mem(arg);
+  return arg;
 }
 
-/* Function check if a pointer is safe and valid. */
+/* Function that checks if a pointer is safe and valid. */
 static void access_user_mem (const void *uaddr) {
   if (!is_user_vaddr(uaddr) || pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) {
-    sys_exit(-1);
+    exit(-1);
   }
 }
 
 /* Terminates Pintos. */
-static void sys_halt(void) {
+static void sys_halt(struct intr_frame *f UNUSED) {
   free(filesys_lock);
   shutdown_power_off();
 }
 
 /* Terminates current user program. */
-static void sys_exit(int status) {
+static void sys_exit(struct intr_frame *f) {
+  int status = (int) *get_arg(f, 1);
+  exit(status);
+}
+
+/* Helper for sys_exit() to support 'int status' variable yet mantain syscall modularity. */
+static void exit(int status) {
   thread_current()->manager->exit_status = status;
   printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
 
 /* Runs the executable given. */
-static pid_t sys_exec(const char *file) {
+static void sys_exec(struct intr_frame *f) {
+  const char *file = (const char *) *get_arg(f, 1);
+
   access_user_mem(file);
+
   lock_acquire(filesys_lock);
   int result = process_execute(file);
   lock_release(filesys_lock);
 
-  return result;
+  f->eax = result;
 }
 
 /* Calls process_wait() to handle parent/child wait functionality. */
-static int sys_wait(pid_t pid) {
-  return process_wait(pid);
+static void sys_wait(struct intr_frame *f) {
+  pid_t pid = (pid_t) *get_arg(f, 1);
+  f->eax = process_wait(pid);
 };
 
 /* Creates a new file named by input with a specified size. */
-static bool sys_create(const char *file, unsigned initial_size) {
+static void sys_create(struct intr_frame *f) {
+  const char *file = (const char *) *get_arg(f, 1);
+  unsigned initial_size = (unsigned) *get_arg(f, 2);
+
   access_user_mem(file);
   lock_acquire(filesys_lock);
   bool result = filesys_create(file, initial_size);
   lock_release(filesys_lock);
 
-  return result;
+  f->eax = result;
 }
 
 /* Deletes specified file if possible, returning a value depending on success or failure. */
-static bool sys_remove(const char *file) {
+static void sys_remove(struct intr_frame *f) {
+  const char *file = (const char *) *get_arg(f, 1); 
+
   access_user_mem(file);
   lock_acquire(filesys_lock);
   bool result = filesys_remove(file);
   lock_release(filesys_lock);
 
-  return result;
+  f->eax = result;
 }
 
 /* Opens the file specified. */
-static int sys_open(const char *file) {
+static void sys_open(struct intr_frame *f) {
+  const char *file = (const char *) *get_arg(f, 1); 
+
   access_user_mem(file);
+
   lock_acquire(filesys_lock);
-  struct file *f = filesys_open(file);
+  struct file *file_open = filesys_open(file);
   lock_release(filesys_lock);
 
   /* Returns -1 if file does not exist. */
-  if (f == NULL) {
-    return -1;
+  if (file_open == NULL) {
+    f->eax = -1;
+    return;
   }
 
   struct file_descriptor *fd_elem = malloc(sizeof(struct file_descriptor));
 
   /* Returns -1 if memory could not be allocated for this file (descriptor). */
   if (fd_elem == NULL) {
-    file_close(f);
-    return -1;
+    file_close(file_open);
+    f->eax = -1;
+    return;
   }
 
   lock_acquire(filesys_lock);
-  fd_elem->file = f;
+  fd_elem->file = file_open;
   fd_elem->fd = allocate_fd();
   list_push_back(thread_current()->file_descriptors, &fd_elem->elem);
   lock_release(filesys_lock);
-  return fd_elem->fd;
+
+  f->eax = fd_elem->fd;
 }
 
 /* Returns filesize for a specified file descriptor. */
-int sys_filesize(int fd) {
+static void sys_filesize(struct intr_frame *f) {
+  int fd = (int) *get_arg(f, 1);
+
   struct file *file = fd_to_file(fd);
   int size = -1;
 
@@ -274,12 +238,19 @@ int sys_filesize(int fd) {
     lock_release(filesys_lock);
   }
   
-  return size;
+  f->eax = size;
 }
 
 /* Reads "size" bytes from file open as fd into buffer. */
-static int sys_read(int fd, void *buffer, unsigned size) {
+static void sys_read(struct intr_frame *f) {
+  int fd = (int) *get_arg(f, 1);
+  void *buffer = (void *) *get_arg(f, 2);
+  unsigned size = (unsigned) *get_arg(f, 3);
+
   access_user_mem(buffer);
+
+  int bytes_read = -1;
+
   /* Handles reading from keyboard if fd value is 0 or greater than 1. */
   if (fd == STDIN_FILENUM) {
     uint8_t *buf = (uint8_t *) buffer;
@@ -287,10 +258,10 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     for (unsigned i = 0; i < size; i++) {
       buf[i] = input_getc();
     }
-    return size;
+    f->eax = size;
+    return;
   } else if (fd > STDOUT_FILENUM) {
     lock_acquire(filesys_lock);
-    int bytes_read = -1;
     struct file *file = fd_to_file(fd);
 
     if (file != NULL) {
@@ -298,28 +269,39 @@ static int sys_read(int fd, void *buffer, unsigned size) {
     }
 
     lock_release(filesys_lock);
-    return bytes_read;
+
+    f->eax = bytes_read;
+    return;
   }
+
   /* Handles invalid fd values. */
-  return -1;
+  f->eax = -1;
 }
 
 /* Writes to file or console depending on fd value. */
-static int sys_write(int fd, const void *buffer, unsigned size) {
+static void sys_write(struct intr_frame *f) {
+  int fd = (int) *get_arg(f, 1);
+  const void *buffer = (const void *) *get_arg(f, 2);
+  unsigned size = (unsigned) *get_arg(f, 3);
+
   access_user_mem(buffer);
- /* Handles standard output fd value to write to console or anything greater. */
+  int bytes_written = -1;
+
+  /* Handles standard output fd value to write to console, or anything greater. */
   if (fd == STDOUT_FILENUM) {
     const char *charBuffer = (const char *) buffer;
 
     /* Checking buffer is not NULL, if NULL return 0 since no byte was written. */
     if (charBuffer == NULL) {
-      return 0;
+      f->eax = -1;
+      return;
     }
 
     /* Handles sizes that are greater than 400 bytes and breaks it down. */
     int sizeCount = size;
+
     while (sizeCount != 0) {
-      if (sizeCount < 400) {
+      if (sizeCount <= 400) {
         putbuf(charBuffer, sizeCount);
         sizeCount = 0;
       } else {
@@ -329,26 +311,31 @@ static int sys_write(int fd, const void *buffer, unsigned size) {
       }
     }
 
-    return size;
+    f->eax = size;
+    return;
   } else if (fd > STDOUT_FILENUM) {
     lock_acquire(filesys_lock);
+
     struct file *file = fd_to_file(fd);
-    int bytes_written = -1;
 
     if (file != NULL) {
       bytes_written = file_write(file, buffer, size);
     }
 
     lock_release(filesys_lock);
-    return bytes_written;
+
+    f->eax = bytes_written;
+    return;
   }
 
   /* Handles invalid fd values. */
-  return -1;
+  f->eax = bytes_written;
 }
 
 /* Changes the next byte to be read in a file to "position". */
-void sys_seek (int fd, unsigned position) {
+static void sys_seek (struct intr_frame *f) {
+  int fd = (int) *get_arg(f, 1);
+  unsigned position = (unsigned) *get_arg(f, 2);
   struct file *file = fd_to_file(fd);
 
   /* If the fd value is not valid or the file is NULL, it exits. */
@@ -357,31 +344,29 @@ void sys_seek (int fd, unsigned position) {
     file_seek(file, position);
     lock_release(filesys_lock);
   } else {
-    sys_exit(-1);
+    exit(-1);
   }
 }
 
 /* Returns the poisiton of the next byte to be written for fd. */
-static unsigned sys_tell(int fd) {
+static void sys_tell(struct intr_frame *f) {
+  int fd = (int) *get_arg(f, 1);
   struct file *file = fd_to_file(fd);
-  unsigned position = -1;
 
   /* If the fd value is not valid or the file is NULL, it exits. */
   if (file != NULL && fd > STDOUT_FILENUM) {
     lock_acquire(filesys_lock);
-    position = file_tell(file);
+    unsigned position = file_tell(file);
     lock_release(filesys_lock);
-    return position;
+    f->eax = position;
   } else {
-    sys_exit(-1);
+    exit(-1);
   }
-
-  /* Should not reach this line, for compiler warning supression. */
-  return position;
 }
 
 /* Closes file descriptor fd. */
-static void sys_close(int fd) {
+static void sys_close(struct intr_frame *f) {
+  int fd = (int) *get_arg(f, 1);
   struct file *file = fd_to_file(fd);
 
   if (file != NULL && fd > STDOUT_FILENUM) {
@@ -393,13 +378,12 @@ static void sys_close(int fd) {
       list_remove(&file_descriptor->elem);
       free(file_descriptor);
       lock_release(filesys_lock);
-      return;
     }
   }
 }
 
 /* Finds an available fd value by iterating through file_descriptors of thread. */
-int allocate_fd(void) {
+static int allocate_fd(void) {
   int fd = 2; /* Starts from 2 to avoid conflicts with standard input/output values. */
 
   while (fd_to_file_descriptor(fd) != NULL) {
@@ -410,7 +394,7 @@ int allocate_fd(void) {
 }
 
 /* Grabs the file_descriptor struct associated with an fd value from some thread. */
-struct file_descriptor *fd_to_file_descriptor(int fd) {
+static struct file_descriptor *fd_to_file_descriptor(int fd) {
   struct list_elem *e;
   struct thread *current_thread = thread_current();
 
@@ -424,11 +408,12 @@ struct file_descriptor *fd_to_file_descriptor(int fd) {
     }
   }
 
-  return NULL; /* If the file descriptor is not found, return NULL. */
+  /* If the file descriptor is not found, return NULL. */
+  return NULL;
 }
 
-/* Grabs the file associated with an fd value from some thread. */
-struct file *fd_to_file(int fd) {
+/* Grabs the file associated with an fd value from some thread, otherwise NULL. */
+static struct file *fd_to_file(int fd) {
   struct file_descriptor *file_descriptor = fd_to_file_descriptor(fd);
 
   if (file_descriptor == NULL) {
