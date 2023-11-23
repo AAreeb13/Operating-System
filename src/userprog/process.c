@@ -95,7 +95,6 @@ start_process (void *file_name_)
 
   // Deny writes to the executable file.
   if (success) {
-//    thread_current()->manager->load_status = LOAD_SUCCESS;
     thread_current()->executable = filesys_open(token);
     file_deny_write(thread_current()->executable);
 
