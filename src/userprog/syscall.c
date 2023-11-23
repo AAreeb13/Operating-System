@@ -107,6 +107,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     exit(-1);
   }
 
+  /* Calls indexed system call on f. Stores result in f->eax internally for each system call. */
   system_calls[syscall_number](f);
 }
 
@@ -304,6 +305,7 @@ static void sys_write(struct intr_frame *f) {
         putbuf(charBuffer, 400);
         sizeCount -= 400;
         charBuffer += 400;
+        access_user_mem(charBuffer);
       }
     }
 
