@@ -19,6 +19,8 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
+#define MAX_CMD_SIZE 2000
+#define MAX_POINTER_ARRAY_SIZE 500
 
 
 static thread_func start_process NO_RETURN;
@@ -38,8 +40,8 @@ static int parse_arg(struct intr_frame *, char *, int);
 tid_t
 process_execute (const char *file_name) 
 {
-  /* Restricts the cmd line to less than 4KB to prevent stack overflow*/
-  if (strlen(file_name) > 4090) {
+  /* Restricts the cmd line to prevent stack overflow*/
+  if (strlen(file_name) > MAX_CMD_SIZE) {
     return TID_ERROR;
   }
   char *fn_copy;
@@ -107,14 +109,13 @@ start_process (void *file_name_)
       token = strtok_r(NULL, " ", &save_ptr);
       count++;
     }
-    if (count >= 500) {
-      thread_current()->manager->exit_status = -1;
+    /* Check for stack overflow due to pointers */
+    if (count >= MAX_POINTER_ARRAY_SIZE) {
       palloc_free_page (file_name);
       thread_exit();
     }
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
     if (parse_arg(&if_, file_copy, count) == -1) {
-      thread_current()->manager->exit_status = -1;
       palloc_free_page (file_name);
       thread_exit();
     }
