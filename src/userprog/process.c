@@ -31,6 +31,7 @@ static void parent_exit(struct list *);
 
 static void free_manager(struct manager *);
 
+static int load_and_process(char *, struct intr_frame *);
 static int parse_arg(struct intr_frame *, char *, int);
 
 /* Starts a new thread running a user program loaded from
@@ -40,7 +41,7 @@ static int parse_arg(struct intr_frame *, char *, int);
 tid_t
 process_execute (const char *file_name) 
 {
-  /* Restricts the cmd line to prevent stack overflow*/
+  /* Restricts the cmd line to prevent stack overflow. */
   if (strlen(file_name) > MAX_CMD_SIZE) {
     return TID_ERROR;
   }
@@ -59,6 +60,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR) 
     palloc_free_page (fn_copy);
 
+  /* Waits for child to finish loading executable. */
   struct list *managers = thread_current()->managers;
   struct manager *manager; struct list_elem *e;
   bool load_status = false;
@@ -72,27 +74,17 @@ process_execute (const char *file_name)
   return load_status ? tid : TID_ERROR;
 }
 
-/* A thread function that loads a user process and starts it
-   running. */
-static void
-start_process (void *file_name_)
-{
-  char *file_name = file_name_;
-  struct intr_frame if_;
+/* Loads the executable, denies write to executable and sets up user stack */
+static int load_and_process(char *file_name, struct intr_frame *if_) {
   bool success;
-
-  /* Initialize interrupt frame and load executable. */
-  memset (&if_, 0, sizeof if_);
-  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
-  if_.cs = SEL_UCSEG;
-  if_.eflags = FLAG_IF | FLAG_MBS;
-
   char *token, *save_ptr;
   char file_copy[strlen(file_name) + 1];
+
+  /* Load executable and wakes up parent so it can read load_status */
   strlcpy(file_copy, file_name, strlen(file_name) + 1);
   token = strtok_r(file_copy, " ", &save_ptr);
   strlcpy(thread_current()->name, token, sizeof thread_current()->name);
-  success = load (token, &if_.eip, &if_.esp);
+  success = load (token, &(if_->eip), &(if_->esp));
   thread_current()->manager->load_status = success;
   sema_up(thread_current()->manager->wait_sema);
 
@@ -103,29 +95,90 @@ start_process (void *file_name_)
     file_deny_write(thread_current()->executable);
     lock_release(filesys_lock);
 
-    /* Counts number of arguments and sets up stack */
+    /* Counts number of arguments to check for stackoverflow */
     int count = 0;
     while (token != NULL) {
       token = strtok_r(NULL, " ", &save_ptr);
       count++;
     }
-
-    /* Check for stack overflow due to pointers */
     if (count >= MAX_POINTER_ARRAY_SIZE) {
-      palloc_free_page (file_name);
-      thread_exit();
+      return -1;
     }
+
+    /* Sets up user stack and checks if it failed */
     strlcpy(file_copy, file_name, strlen(file_name) + 1);
-    if (parse_arg(&if_, file_copy, count) == -1) {
-      palloc_free_page (file_name);
-      thread_exit();
-    }
+    parse_arg(if_, file_copy, count);
+//    if (parse_arg(if_, file_copy, count) == -1) {
+//      return -1;
+//    }
+  } else {
+    return -1;
   }
 
-  /* If load failed, quit. */
+  return 1;
+}
+
+/* A thread function that loads a user process and starts it
+   running. */
+static void
+start_process (void *file_name_)
+{
+  char *file_name = file_name_;
+  struct intr_frame if_;
+//  bool success;
+
+  /* Initialize interrupt frame and load executable. */
+  memset (&if_, 0, sizeof if_);
+  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
+  if_.cs = SEL_UCSEG;
+  if_.eflags = FLAG_IF | FLAG_MBS;
+
+  // result = -1 means something went wrong
+  int result = load_and_process(file_name, &if_);
   palloc_free_page (file_name);
-  if (!success)
-    thread_exit ();
+  if (result == -1) {
+    thread_exit();
+  }
+//  /* Tokenizes file_name and puts program name into load */
+//  char *token, *save_ptr;
+//  char file_copy[strlen(file_name) + 1];
+//  strlcpy(file_copy, file_name, strlen(file_name) + 1);
+//  token = strtok_r(file_copy, " ", &save_ptr);
+//  strlcpy(thread_current()->name, token, sizeof thread_current()->name);
+//  success = load (token, &if_.eip, &if_.esp);
+//  thread_current()->manager->load_status = success;
+//  sema_up(thread_current()->manager->wait_sema);
+//
+//  /* Deny writes to the executable file. */
+//  if (success) {
+//    lock_acquire(filesys_lock);
+//    thread_current()->executable = filesys_open(token);
+//    file_deny_write(thread_current()->executable);
+//    lock_release(filesys_lock);
+//
+//    /* Counts number of arguments to check for stackoverflow */
+//    int count = 0;
+//    while (token != NULL) {
+//      token = strtok_r(NULL, " ", &save_ptr);
+//      count++;
+//    }
+//    if (count >= MAX_POINTER_ARRAY_SIZE) {
+//      palloc_free_page (file_name);
+//      thread_exit();
+//    }
+//
+//    /* Sets up user stack */
+//    strlcpy(file_copy, file_name, strlen(file_name) + 1);
+//    if (parse_arg(&if_, file_copy, count) == -1) {
+//      palloc_free_page (file_name);
+//      thread_exit();
+//    }
+//  }
+//
+//  /* If load failed, quit. */
+//  palloc_free_page (file_name);
+//  if (!success)
+//    thread_exit ();
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -153,11 +206,11 @@ process_wait (tid_t child_tid)
     return TID_ERROR;
   }
 
-  /* Traverse managers and wait on child process if valid. */
   struct list_elem *e;
   struct manager *manager;
   struct list *managers = thread_current()->managers;
 
+  /* Traverse managers and wait on child process if valid. */
   for (e = list_begin(managers); e != list_end(managers); e = list_next(e)) {
     manager = list_entry(e, struct manager, elem);
     if (manager->child_pid == child_tid) {
@@ -656,10 +709,10 @@ static int parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
     counter--;
   }
 
-  /* Check for stack overflow */
-  if (char_pointer - 4*(count) < 10) {
-    return -1;
-  }
+//  /* Check for stack overflow */
+//  if (char_pointer - 4*(count) < 10) {
+//    return -1;
+//  }
 
   /* Push Null pointer sentinel */
   void **void_star_pointer = (void **) char_pointer;
