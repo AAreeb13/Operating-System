@@ -107,10 +107,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     exit(-1);
   }
 
+  /* Calls indexed system call on f. Stores result in f->eax internally for each system call. */
   system_calls[syscall_number](f);
 }
 
-/* Grabs an argument i from stack correctly and returns it. */
+/* Grabs an argument i starting from the stack pointer, and returns it. */
 uint32_t *get_arg (struct intr_frame *f, int i) {
   uint32_t *syscall_number_address = (uint32_t *) f->esp;
   uint32_t *arg = syscall_number_address + i;
@@ -254,6 +255,7 @@ static void sys_read(struct intr_frame *f) {
     for (unsigned i = 0; i < size; i++) {
       buf[i] = input_getc();
     }
+    
     f->eax = size;
     return;
   } else if (fd > STDOUT_FILENUM) {
@@ -304,6 +306,7 @@ static void sys_write(struct intr_frame *f) {
         putbuf(charBuffer, 400);
         sizeCount -= 400;
         charBuffer += 400;
+        access_user_mem(charBuffer);
       }
     }
 

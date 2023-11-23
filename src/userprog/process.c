@@ -28,6 +28,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 static void child_exit(struct manager *);
 static void parent_exit(struct list *);
+static void free_fds(struct list *);
 
 static void free_manager(struct manager *);
 
@@ -92,7 +93,7 @@ start_process (void *file_name_)
   /* Loads executable, denies write and sets up stack */
   int result = load_and_process(file_name, &if_);
   palloc_free_page (file_name);
-  /* result equals -1 if any of the processes did not work */
+  /* Result equals -1 if any of the processes did not work */
   if (result == -1) {
     thread_exit();
   }
@@ -152,6 +153,7 @@ process_exit (void)
   struct manager *manager = cur->manager;
   struct list *managers = cur->managers;
 
+  /* Allow writes to the executable file. */
   if (cur->executable != NULL) {
     file_allow_write(cur->executable);
     file_close(cur->executable);
@@ -166,17 +168,7 @@ process_exit (void)
   }
 
   if (cur->file_descriptors != NULL) {
-    struct list *fds = cur->file_descriptors;
-    struct list_elem *e = list_begin(fds);
-    struct file_descriptor *fd;
-    
-    while (e != list_end(fds)) {
-      fd = list_entry(e, struct file_descriptor, elem);
-      file_close(fd->file);
-      list_remove(e);
-      e = list_next(e);
-      free(fd);
-    }
+    free_fds(cur->file_descriptors);
   }
 
   /* Destroy the current process's page directory and switch back
@@ -599,6 +591,7 @@ static void free_manager(struct manager *manager) {
   free(manager);
 }
 
+
 /* Loads the executable, denies write to executable and sets up user stack */
 static int load_and_process(char *file_name, struct intr_frame *if_) {
   bool success;
@@ -642,6 +635,22 @@ static int load_and_process(char *file_name, struct intr_frame *if_) {
 
 /* Sets up user stack and sets stack pointer to return address */
 
+
+/* Frees file descriptors associated with list. */
+void free_fds(struct list *fds) {
+  struct list_elem *e = list_begin(fds);
+  struct file_descriptor *fd;
+    
+  while (e != list_end(fds)) {
+    fd = list_entry(e, struct file_descriptor, elem);
+    file_close(fd->file);
+    list_remove(e);
+    e = list_next(e);
+    free(fd);
+  }
+}
+
+/* Sets up user stack */
 
 static void parse_arg(struct intr_frame *intrFrame, char *file_copy, int count) {
   char *token, *save_ptr;

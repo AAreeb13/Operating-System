@@ -8,6 +8,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 
+/* Global file system lock for synchronisation. */
 struct lock *filesys_lock;
 
 #endif /* userprog/process.h */
