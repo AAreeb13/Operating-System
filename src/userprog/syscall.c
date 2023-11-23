@@ -139,7 +139,7 @@ static void sys_exit(struct intr_frame *f) {
 
 /* Helper for sys_exit() to support 'int status' variable yet mantain syscall modularity. */
 static void exit(int status) {
-  thread_current()->manager->exit_status = status;
+  thread_current()->exit_status = status;
   thread_exit();
 }
 

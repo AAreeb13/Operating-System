@@ -109,6 +109,7 @@ start_process (void *file_name_)
       token = strtok_r(NULL, " ", &save_ptr);
       count++;
     }
+
     /* Check for stack overflow due to pointers */
     if (count >= MAX_POINTER_ARRAY_SIZE) {
       palloc_free_page (file_name);
@@ -590,9 +591,7 @@ install_page (void *upage, void *kpage, bool writable)
 /* Child process writes its exit_status and frees manager if parent is dead. */
 static void child_exit(struct manager *manager) {
   lock_acquire(manager->rw_lock);
-  if (manager->exit_status == THREAD_ALIVE) {
-    manager->exit_status = THREAD_EXIT;
-  }
+  manager->exit_status = thread_current()->exit_status == THREAD_ALIVE ? THREAD_EXIT : thread_current()->exit_status;
   printf("%s: exit(%d)\n", thread_current()->name, manager->exit_status);
   if (manager->parent_dead) {
     free_manager(manager);
@@ -628,7 +627,7 @@ static void free_manager(struct manager *manager) {
   free(manager->wait_sema);
   free(manager);
 }
-//
+
 /* Consider if you stack grows beyond 4kb, you may wanna keep a running sum
  * Takes in interrupt frame, token and save_ptr to setup user stack
  * What it needs to do:

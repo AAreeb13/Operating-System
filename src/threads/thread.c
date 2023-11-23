@@ -246,7 +246,7 @@ thread_create (const char *name, int priority,
     manager->wait_sema = sema;
     manager->rw_lock = lock;
     manager->parent_dead = false;
-    manager->exit_status = THREAD_ALIVE;
+    t->exit_status = manager->exit_status = THREAD_ALIVE;
     manager->load_status = false;
     manager->child_pid = tid;
     list_push_back(thread_current()->managers, &manager->elem);

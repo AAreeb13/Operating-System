@@ -101,6 +101,7 @@ struct thread
 
 #ifdef USERPROG
     uint32_t *pagedir;                  /* Page directory. */
+    int exit_status;
     struct list *file_descriptors;      /* List of file descriptors. */
     struct list *managers;              /* List of child processes */
     struct manager *manager;            /* Element of parent's managers list */
